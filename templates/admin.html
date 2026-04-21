@@ -3,6 +3,24 @@
 <div class="admin-page">
   <h2 class="page-title">⚙️ Administration</h2>
 
+  <!-- Config -->
+  <div class="card" style="margin-bottom:16px">
+    <h3 class="card-title">⚙️ Configuration</h3>
+    <form method="POST" action="{{ url_for('save_config') }}" class="inline-form">
+      <div class="form-group">
+        <label class="field-label">Fuseau horaire</label>
+        <select name="timezone" class="form-select">
+          <option value="Europe/Brussels" {% if timezone == 'Europe/Brussels' %}selected{% endif %}>Europe/Brussels (UTC+1/+2)</option>
+          <option value="Europe/Paris" {% if timezone == 'Europe/Paris' %}selected{% endif %}>Europe/Paris (UTC+1/+2)</option>
+          <option value="Europe/London" {% if timezone == 'Europe/London' %}selected{% endif %}>Europe/London (UTC+0/+1)</option>
+          <option value="America/New_York" {% if timezone == 'America/New_York' %}selected{% endif %}>America/New_York (UTC-5/-4)</option>
+          <option value="UTC" {% if timezone == 'UTC' %}selected{% endif %}>UTC</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">💾 Sauvegarder</button>
+    </form>
+  </div>
+
   <div class="admin-grid">
 
     <!-- Users -->

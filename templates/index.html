@@ -122,7 +122,12 @@ function startTimer() {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ client_id: parseInt(clientId), service_id: parseInt(serviceId), colleagues })
   })
-  .then(r => r.json())
+  .then(r => {
+    if (r.status === 409) {
+      return r.json().then(d => { throw new Error(d.error); });
+    }
+    return r.json();
+  })
   .then(data => {
     sessionId = data.session_id;
     templateId = data.template_id;
@@ -143,6 +148,9 @@ function startTimer() {
     document.getElementById('timer-running').classList.remove('hidden');
 
     timerInterval = setInterval(updateDisplay, 1000);
+  })
+  .catch(err => {
+    alert('⚠️ ' + err.message);
   });
 }
 

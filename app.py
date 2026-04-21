@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from datetime import datetime
-import os, hashlib
+import os, hashlib, math
 
 app = Flask(__name__)
 app.secret_key = 'cxmedia-secret-2024'
@@ -92,6 +92,17 @@ def init_db():
             session_id TEXT NOT NULL,
             user_id INTEGER NOT NULL
         )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS active_sessions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            session_id TEXT NOT NULL,
+            client_id INTEGER NOT NULL,
+            started_at TEXT NOT NULL
+        )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS app_config (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )''')
     else:
         c.execute('''CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,6 +145,17 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT NOT NULL,
             user_id INTEGER NOT NULL
+        )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS active_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            session_id TEXT NOT NULL,
+            client_id INTEGER NOT NULL,
+            started_at TEXT NOT NULL
+        )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS app_config (
+            key TEXT PRIMARY KEY,
+            value TEXT
         )''')
 
     # Admin par défaut
@@ -259,7 +281,8 @@ def index():
         clients = [dict(r) for r in clients_raw]
         users = [dict(r) for r in users_raw]
 
-    return render_template('index.html', clients=clients, users=users)
+    timezone = get_config('timezone', 'Europe/Brussels')
+    return render_template('index.html', clients=clients, users=users, timezone=timezone)
 
 @app.route('/get_services/<int:client_id>')
 @login_required
@@ -286,16 +309,46 @@ def start_timer():
     client_id = data['client_id']
     service_id = data['service_id']
     colleagues = data.get('colleagues', [])
-    session_id = str(uuid.uuid4())
 
     conn = get_db()
     c = conn.cursor()
+
+    # Vérification anti-doublon : user déjà en session sur un AUTRE client ?
+    all_users = [session['user_id']] + colleagues
+    conflicts = []
+    for uid in all_users:
+        c.execute(f"SELECT client_id FROM active_sessions WHERE user_id={PLACEHOLDER}", (uid,))
+        existing = c.fetchone()
+        if existing:
+            existing_client_id = existing[0] if USE_PG else existing['client_id']
+            if int(existing_client_id) != int(client_id):
+                # Récupérer le nom du user et du client en conflit
+                c.execute(f"SELECT username FROM users WHERE id={PLACEHOLDER}", (uid,))
+                urow = c.fetchone()
+                c.execute(f"SELECT name FROM clients WHERE id={PLACEHOLDER}", (existing_client_id,))
+                crow = c.fetchone()
+                uname = urow[0] if USE_PG else urow['username']
+                cname = crow[0] if USE_PG else crow['name']
+                conflicts.append(f"{uname} est déjà en session sur {cname}")
+
+    if conflicts:
+        conn.close()
+        return jsonify({'error': ' | '.join(conflicts)}), 409
+
+    session_id = str(uuid.uuid4())
+    now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+
     c.execute(f"SELECT template_id FROM client_services WHERE id={PLACEHOLDER}", (service_id,))
     row = c.fetchone()
     template_id = row[0] if USE_PG else row['template_id']
 
     for uid in colleagues:
         c.execute(f"INSERT INTO session_colleagues (session_id, user_id) VALUES ({P(2)})", (session_id, uid))
+
+    # Enregistrer sessions actives pour tous les participants
+    for uid in all_users:
+        c.execute(f"INSERT INTO active_sessions (user_id, session_id, client_id, started_at) VALUES ({P(4)})",
+                  (uid, session_id, client_id, now))
 
     conn.commit()
     conn.close()
@@ -325,8 +378,10 @@ def stop_timer():
 
     start_dt = datetime.fromisoformat(start_time)
     end_dt = datetime.fromisoformat(end_time)
-    total_minutes = (end_dt - start_dt).total_seconds() / 60
-    net_minutes = max(0, total_minutes - pause_minutes)
+    total_seconds = (end_dt - start_dt).total_seconds()
+    pause_seconds = pause_minutes * 60
+    net_seconds = max(0, total_seconds - pause_seconds)
+    net_minutes = math.ceil(net_seconds / 60)  # Arrondi à la minute supérieure
 
     conn = get_db()
     c = conn.cursor()
@@ -341,6 +396,10 @@ def stop_timer():
             (user_id, client_id, template_id, start_time, end_time, duration_minutes, pause_minutes, is_manual, justification, session_id)
             VALUES ({P(10)})
         """, (uid, client_id, template_id, start_time, end_time, net_minutes, pause_minutes, 0, justification, session_id))
+
+    # Supprimer les sessions actives pour ces users
+    for uid in user_ids:
+        c.execute(f"DELETE FROM active_sessions WHERE user_id={PLACEHOLDER}", (uid,))
 
     conn.commit()
     conn.close()
@@ -485,8 +544,9 @@ def admin():
         templates = [dict(r) for r in templates_raw]
         client_services = [dict(r) for r in cs_raw]
 
+    timezone = get_config('timezone', 'Europe/Brussels')
     return render_template('admin.html', users=users, clients=clients,
-                           templates=templates, client_services=client_services)
+                           templates=templates, client_services=client_services, timezone=timezone)
 
 @app.route('/admin/add_user', methods=['POST'])
 @admin_required
@@ -792,6 +852,36 @@ def get_services_for_client(client_id):
     if USE_PG:
         return jsonify([{'template_id': r[0], 'name': r[1]} for r in rows])
     return jsonify([dict(r) for r in rows])
+
+# ── CONFIG ────────────────────────────────────────────────────────────────────
+
+def get_config(key, default=''):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(f"SELECT value FROM app_config WHERE key={PLACEHOLDER}", (key,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return row[0] if USE_PG else row['value']
+    return default
+
+def set_config(key, value):
+    conn = get_db()
+    c = conn.cursor()
+    if USE_PG:
+        c.execute(f"INSERT INTO app_config (key, value) VALUES ({P(2)}) ON CONFLICT (key) DO UPDATE SET value={PLACEHOLDER}",
+                  (key, value, value))
+    else:
+        c.execute(f"INSERT OR REPLACE INTO app_config (key, value) VALUES ({P(2)})", (key, value))
+    conn.commit()
+    conn.close()
+
+@app.route('/admin/save_config', methods=['POST'])
+@admin_required
+def save_config():
+    timezone = request.form.get('timezone', 'Europe/Brussels')
+    set_config('timezone', timezone)
+    return redirect(url_for('admin'))
 
 if __name__ == '__main__':
     init_db()
