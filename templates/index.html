@@ -63,6 +63,16 @@
 </div>
 
 <script>
+// Formater une date en heure locale YYYY-MM-DDTHH:MM:SS
+function localISO(d) {
+  return d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0') + 'T' +
+    String(d.getHours()).padStart(2,'0') + ':' +
+    String(d.getMinutes()).padStart(2,'0') + ':' +
+    String(d.getSeconds()).padStart(2,'0');
+}
+
 let timerInterval = null;
 let startTimestamp = null;
 let sessionId = null;
@@ -131,7 +141,7 @@ function startTimer() {
   .then(data => {
     sessionId = data.session_id;
     templateId = data.template_id;
-    startTimestamp = new Date();
+    startTimestamp = new Date();  // heure locale
     totalPauseMs = 0;
     isPaused = false;
 
@@ -208,7 +218,7 @@ function confirmStop() {
   const pauseMinutes = parseFloat(document.getElementById('justify-modal').dataset.pause || 0);
   document.getElementById('justify-modal').classList.add('hidden');
 
-  const endTimestamp = new Date();
+  const endTimestamp = new Date();  // heure locale
   fetch('/stop_timer', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -216,8 +226,8 @@ function confirmStop() {
       session_id: sessionId,
       client_id: parseInt(clientId),
       template_id: templateId,
-      start_time: startTimestamp.toISOString(),
-      end_time: endTimestamp.toISOString(),
+      start_time: localISO(startTimestamp),
+      end_time: localISO(endTimestamp),
       pause_minutes: pauseMinutes,
       justification
     })

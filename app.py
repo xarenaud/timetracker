@@ -374,7 +374,7 @@ def stop_timer():
         return ts
 
     start_time = clean_iso(start_time_raw)
-    end_time = clean_iso(end_time_raw) if end_time_raw else datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+    end_time = clean_iso(end_time_raw) if end_time_raw else clean_iso(start_time_raw)  # fallback = start si pas reçu
 
     start_dt = datetime.fromisoformat(start_time)
     end_dt = datetime.fromisoformat(end_time)
