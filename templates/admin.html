@@ -194,23 +194,6 @@
 </div>
 
 <script>
-function loadManualServices() {
-  const clientId = document.getElementById('manual-client').value;
-  if (!clientId) return;
-  fetch('/admin/get_services_for_client/' + clientId)
-    .then(r => r.json())
-    .then(data => {
-      const sel = document.getElementById('manual-service');
-      sel.innerHTML = '<option value="">— Prestation —</option>';
-      data.forEach(s => {
-        sel.innerHTML += `<option value="${s.template_id}">${s.name}</option>`;
-      });
-    });
-}
-</script>
-{% endblock %}
-
-<script>
 // Nouveau client - toggle form
 function toggleNewClient() {
   const box = document.getElementById('new-client-box');
@@ -246,30 +229,19 @@ function loadClientServicesInline(clientId) {
       container.innerHTML = '';
       data.forEach(s => {
         const checked = s.assigned ? 'checked' : '';
-        const hours = s.monthly_hours || '';
-        const disabled = s.assigned ? '' : 'disabled';
+        const hours = s.monthly_hours > 0 ? s.monthly_hours : '';
         container.innerHTML +=
           '<div class="service-check-row">' +
             '<label class="chip-check">' +
-              '<input type="checkbox" name="selected_' + s.template_id + '" value="1" ' + checked +
-                ' onchange="toggleHoursInline(this, ' + clientId + ', ' + s.template_id + ')"/>' +
+              '<input type="checkbox" name="selected_' + s.template_id + '" value="1" ' + checked + '/>' +
               ' ' + s.name +
             '</label>' +
             '<input type="number" name="hours_' + s.template_id + '" value="' + hours + '"' +
               ' step="0.5" min="0" placeholder="h/mois"' +
-              ' class="form-input form-input-xs" ' + disabled + '/>' +
+              ' class="form-input form-input-xs"/>' +
           '</div>';
       });
     });
-}
-
-function toggleHoursInline(checkbox, clientId, templateId) {
-  const form = document.querySelector('#cs-row-' + clientId + ' form');
-  const input = form.querySelector('input[name="hours_' + templateId + '"]');
-  if (input) {
-    input.disabled = !checkbox.checked;
-    if (!checkbox.checked) input.value = '';
-  }
 }
 
 function loadManualServices() {
@@ -286,3 +258,4 @@ function loadManualServices() {
     });
 }
 </script>
+{% endblock %}
