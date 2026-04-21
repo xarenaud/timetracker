@@ -85,45 +85,38 @@
     </div>
 
     <!-- Assign Services to Clients -->
-    <div class="card">
+    <div class="card card-full">
       <h3 class="card-title">🔗 Affecter prestations aux clients</h3>
-      <form method="POST" action="{{ url_for('assign_service') }}" class="inline-form">
-        <select name="client_id" class="form-select" required>
-          <option value="">Client</option>
+
+      <!-- Sélection client -->
+      <div class="form-group mb-3">
+        <label class="field-label">Sélectionner un client</label>
+        <select id="assign-client" class="form-select" onchange="loadClientServices()">
+          <option value="">— Choisir un client —</option>
           {% for c in clients %}
             <option value="{{ c.id }}">{{ c.name }}</option>
           {% endfor %}
         </select>
-        <select name="template_id" class="form-select" required>
-          <option value="">Prestation</option>
-          {% for t in templates %}
-            <option value="{{ t.id }}">{{ t.name }}</option>
-          {% endfor %}
-        </select>
-        <input type="number" name="monthly_hours" placeholder="Heures/mois" step="0.5" min="0" class="form-input form-input-sm"/>
-        <button type="submit" class="btn btn-primary">+ Affecter</button>
-      </form>
-      <table class="table mt-2">
-        <thead><tr><th>Client</th><th>Prestation</th><th>Quota/mois</th><th>Actions</th></tr></thead>
-        <tbody>
-          {% for cs in client_services %}
-          <tr>
-            <td>{{ cs.client_name }}</td>
-            <td>{{ cs.service_name }}</td>
-            <td>
-              <form method="POST" action="{{ url_for('edit_service', csid=cs.id) }}" class="inline-form-mini">
-                <input type="number" name="monthly_hours" value="{{ cs.monthly_hours }}" step="0.5" min="0" class="form-input form-input-xs"/>
-                <button type="submit" class="btn btn-xs btn-success">💾</button>
-              </form>
-            </td>
-            <td>
-              <a href="{{ url_for('delete_service', csid=cs.id) }}" class="btn btn-xs btn-danger"
-                 onclick="return confirm('Supprimer cette affectation ?')">🗑</a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      </div>
+
+      <!-- Formulaire services -->
+      <div id="assign-services-box" style="display:none">
+        <form method="POST" action="{{ url_for('assign_services_bulk') }}" id="assign-form">
+          <input type="hidden" name="client_id" id="assign-client-id"/>
+          <table class="table" id="assign-table">
+            <thead>
+              <tr>
+                <th>✅</th>
+                <th>Prestation</th>
+                <th>Heures / mois</th>
+              </tr>
+            </thead>
+            <tbody id="assign-tbody">
+            </tbody>
+          </table>
+          <button type="submit" class="btn btn-primary mt-2">💾 Valider toutes les affectations</button>
+        </form>
+      </div>
     </div>
 
     <!-- Manual Entry -->
@@ -206,3 +199,46 @@ function loadManualServices() {
 }
 </script>
 {% endblock %}
+
+<script>
+function loadClientServices() {
+  const clientId = document.getElementById('assign-client').value;
+  if (!clientId) {
+    document.getElementById('assign-services-box').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('assign-client-id').value = clientId;
+
+  fetch('/admin/get_client_assignments/' + clientId)
+    .then(r => r.json())
+    .then(data => {
+      const tbody = document.getElementById('assign-tbody');
+      tbody.innerHTML = '';
+
+      data.forEach(s => {
+        const checked = s.assigned ? 'checked' : '';
+        const hours = s.monthly_hours || '';
+        tbody.innerHTML += `
+          <tr>
+            <td><input type="checkbox" name="selected_${s.template_id}" value="1" ${checked} onchange="toggleHours(this, ${s.template_id})"/></td>
+            <td>${s.name}</td>
+            <td>
+              <input type="number" name="hours_${s.template_id}" value="${hours}"
+                step="0.5" min="0" placeholder="0"
+                class="form-input form-input-xs"
+                ${s.assigned ? '' : 'disabled'}/>
+            </td>
+          </tr>`;
+      });
+
+      document.getElementById('assign-services-box').style.display = 'block';
+    });
+}
+
+function toggleHours(checkbox, templateId) {
+  const hoursInput = document.querySelector(`input[name="hours_${templateId}"]`);
+  hoursInput.disabled = !checkbox.checked;
+  if (!checkbox.checked) hoursInput.value = '';
+}
+</script>

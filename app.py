@@ -614,6 +614,87 @@ def assign_service():
     conn.close()
     return redirect(url_for('admin'))
 
+@app.route('/admin/get_client_assignments/<int:client_id>')
+@admin_required
+def get_client_assignments(client_id):
+    conn = get_db()
+    c = conn.cursor()
+    # Tous les templates actifs
+    c.execute(f"SELECT id, name FROM service_templates WHERE active=1 ORDER BY name")
+    all_templates = c.fetchall()
+    # Déjà affectés à ce client
+    c.execute(f"SELECT template_id, monthly_hours FROM client_services WHERE client_id={PLACEHOLDER}", (client_id,))
+    assigned_raw = c.fetchall()
+    conn.close()
+
+    if USE_PG:
+        assigned = {r[0]: r[1] for r in assigned_raw}
+        result = []
+        for t in all_templates:
+            tid = t[0]
+            result.append({
+                'template_id': tid,
+                'name': t[1],
+                'assigned': tid in assigned,
+                'monthly_hours': assigned.get(tid, 0)
+            })
+    else:
+        assigned = {r['template_id']: r['monthly_hours'] for r in assigned_raw}
+        result = []
+        for t in all_templates:
+            tid = t['id']
+            result.append({
+                'template_id': tid,
+                'name': t['name'],
+                'assigned': tid in assigned,
+                'monthly_hours': assigned.get(tid, 0)
+            })
+    return jsonify(result)
+
+@app.route('/admin/assign_services_bulk', methods=['POST'])
+@admin_required
+def assign_services_bulk():
+    client_id = request.form.get('client_id')
+    conn = get_db()
+    c = conn.cursor()
+
+    # Récupérer tous les templates actifs
+    c.execute("SELECT id FROM service_templates WHERE active=1")
+    all_templates = c.fetchall()
+    template_ids = [r[0] if USE_PG else r['id'] for r in all_templates]
+
+    for tid in template_ids:
+        is_selected = request.form.get(f'selected_{tid}')
+        hours = request.form.get(f'hours_{tid}', 0)
+        try:
+            hours = float(hours) if hours else 0
+        except:
+            hours = 0
+
+        # Vérifier si déjà affecté
+        c.execute(f"SELECT id FROM client_services WHERE client_id={PLACEHOLDER} AND template_id={PLACEHOLDER}",
+                  (client_id, tid))
+        existing = c.fetchone()
+
+        if is_selected:
+            if existing:
+                # Mettre à jour les heures
+                c.execute(f"UPDATE client_services SET monthly_hours={PLACEHOLDER} WHERE client_id={PLACEHOLDER} AND template_id={PLACEHOLDER}",
+                          (hours, client_id, tid))
+            else:
+                # Créer l'affectation
+                c.execute(f"INSERT INTO client_services (client_id, template_id, monthly_hours) VALUES ({P(3)})",
+                          (client_id, tid, hours))
+        else:
+            if existing:
+                # Supprimer l'affectation
+                c.execute(f"DELETE FROM client_services WHERE client_id={PLACEHOLDER} AND template_id={PLACEHOLDER}",
+                          (client_id, tid))
+
+    conn.commit()
+    conn.close()
+    return redirect(url_for('admin'))
+
 @app.route('/admin/edit_service/<int:csid>', methods=['POST'])
 @admin_required
 def edit_service(csid):
