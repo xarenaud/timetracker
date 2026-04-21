@@ -203,7 +203,7 @@ def stop_timer():
         start_time_clean = start_time_clean.split('.')[0]
     start_time = start_time_clean
 
-    end_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    end_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
     start_dt = datetime.fromisoformat(start_time)
     end_dt = datetime.fromisoformat(end_time)
     total_minutes = (end_dt - start_dt).total_seconds() / 60

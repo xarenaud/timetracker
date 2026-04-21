@@ -63,4 +63,3 @@ timetracker/
 - Railway (hébergement cloud)
 - Sous-domaine : time.cx-media.be
 - PWA pour installation mobile
-# timetracker

@@ -207,12 +207,7 @@ function confirmStop() {
       session_id: sessionId,
       client_id: parseInt(clientId),
       template_id: templateId,
-      start_time: startTimestamp.getFullYear() + '-' +
-        String(startTimestamp.getMonth()+1).padStart(2,'0') + '-' +
-        String(startTimestamp.getDate()).padStart(2,'0') + 'T' +
-        String(startTimestamp.getHours()).padStart(2,'0') + ':' +
-        String(startTimestamp.getMinutes()).padStart(2,'0') + ':' +
-        String(startTimestamp.getSeconds()).padStart(2,'0'),
+      start_time: startTimestamp.toISOString(),
       pause_minutes: pauseMinutes,
       justification
     })
