@@ -200,6 +200,7 @@ function confirmStop() {
   const pauseMinutes = parseFloat(document.getElementById('justify-modal').dataset.pause || 0);
   document.getElementById('justify-modal').classList.add('hidden');
 
+  const endTimestamp = new Date();
   fetch('/stop_timer', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -208,6 +209,7 @@ function confirmStop() {
       client_id: parseInt(clientId),
       template_id: templateId,
       start_time: startTimestamp.toISOString(),
+      end_time: endTimestamp.toISOString(),
       pause_minutes: pauseMinutes,
       justification
     })

@@ -194,16 +194,19 @@ def stop_timer():
     client_id = data['client_id']
     template_id = data['template_id']
     start_time_raw = data['start_time']
+    end_time_raw = data.get('end_time', '')
     pause_minutes = float(data.get('pause_minutes', 0))
     justification = data.get('justification', '')
 
-    # Nettoyer le format ISO envoyé par JS (ex: 2024-01-15T14:30:00.000Z)
-    start_time_clean = start_time_raw.replace('Z', '').replace('T', 'T')
-    if '.' in start_time_clean:
-        start_time_clean = start_time_clean.split('.')[0]
-    start_time = start_time_clean
+    def clean_iso(ts):
+        ts = ts.replace('Z', '')
+        if '.' in ts:
+            ts = ts.split('.')[0]
+        return ts
 
-    end_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+    start_time = clean_iso(start_time_raw)
+    end_time = clean_iso(end_time_raw) if end_time_raw else datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+
     start_dt = datetime.fromisoformat(start_time)
     end_dt = datetime.fromisoformat(end_time)
     total_minutes = (end_dt - start_dt).total_seconds() / 60
