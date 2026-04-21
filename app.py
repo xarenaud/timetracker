@@ -552,6 +552,16 @@ def toggle_client(cid):
     conn.close()
     return redirect(url_for('admin'))
 
+@app.route('/admin/delete_client/<int:cid>')
+@admin_required
+def delete_client(cid):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(f"DELETE FROM clients WHERE id={PLACEHOLDER}", (cid,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('admin'))
+
 @app.route('/admin/add_template', methods=['POST'])
 @admin_required
 def add_template():
@@ -574,6 +584,16 @@ def toggle_template(tid):
     row = c.fetchone()
     active = row[0] if USE_PG else row['active']
     c.execute(f"UPDATE service_templates SET active={PLACEHOLDER} WHERE id={PLACEHOLDER}", (1 - active, tid))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('admin'))
+
+@app.route('/admin/delete_template/<int:tid>')
+@admin_required
+def delete_template(tid):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(f"DELETE FROM service_templates WHERE id={PLACEHOLDER}", (tid,))
     conn.commit()
     conn.close()
     return redirect(url_for('admin'))

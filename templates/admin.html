@@ -50,7 +50,10 @@
           <tr>
             <td>{{ c.name }}</td>
             <td><span class="badge {% if c.active %}badge-success{% else %}badge-warning{% endif %}">{{ 'Actif' if c.active else 'Inactif' }}</span></td>
-            <td><a href="{{ url_for('toggle_client', cid=c.id) }}" class="btn btn-xs btn-secondary">{{ '🔒' if c.active else '🔓' }}</a></td>
+            <td>
+              <a href="{{ url_for('toggle_client', cid=c.id) }}" class="btn btn-xs btn-secondary">{{ '🔒' if c.active else '🔓' }}</a>
+              <a href="{{ url_for('delete_client', cid=c.id) }}" class="btn btn-xs btn-danger" onclick="return confirm('Supprimer {{ c.name }} ?')">🗑</a>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -71,7 +74,10 @@
           <tr>
             <td>{{ t.name }}</td>
             <td><span class="badge {% if t.active %}badge-success{% else %}badge-warning{% endif %}">{{ 'Actif' if t.active else 'Inactif' }}</span></td>
-            <td><a href="{{ url_for('toggle_template', tid=t.id) }}" class="btn btn-xs btn-secondary">{{ '🔒' if t.active else '🔓' }}</a></td>
+            <td>
+              <a href="{{ url_for('toggle_template', tid=t.id) }}" class="btn btn-xs btn-secondary">{{ '🔒' if t.active else '🔓' }}</a>
+              <a href="{{ url_for('delete_template', tid=t.id) }}" class="btn btn-xs btn-danger" onclick="return confirm('Supprimer {{ t.name }} ?')">🗑</a>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
