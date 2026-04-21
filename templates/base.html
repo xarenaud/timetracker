@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CX-Media TimeTracker</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-brand">⏱ CX-Media</div>
+    <div class="nav-links">
+      {% if session.user_id %}
+        <a href="{{ url_for('index') }}" class="nav-link">Timer</a>
+        <a href="{{ url_for('records') }}" class="nav-link">Records</a>
+        {% if session.role == 'admin' %}
+          <a href="{{ url_for('admin') }}" class="nav-link">Admin</a>
+        {% endif %}
+        <a href="{{ url_for('logout') }}" class="nav-link nav-logout">{{ session.username }} ↩</a>
+      {% endif %}
+    </div>
+  </nav>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

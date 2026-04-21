@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="admin-page">
+  <h2 class="page-title">⚙️ Administration</h2>
+
+  <div class="admin-grid">
+
+    <!-- Users -->
+    <div class="card">
+      <h3 class="card-title">👥 Utilisateurs</h3>
+      <form method="POST" action="{{ url_for('add_user') }}" class="inline-form">
+        <input type="text" name="username" placeholder="Nom d'utilisateur" required class="form-input"/>
+        <input type="password" name="password" placeholder="Mot de passe" required class="form-input"/>
+        <select name="role" class="form-select">
+          <option value="user">Utilisateur</option>
+          <option value="admin">Admin</option>
+        </select>
+        <button type="submit" class="btn btn-primary">+ Ajouter</button>
+      </form>
+      <table class="table mt-2">
+        <thead><tr><th>Nom</th><th>Rôle</th><th>Statut</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>{{ u.username }}</td>
+            <td><span class="badge {% if u.role == 'admin' %}badge-danger{% else %}badge-secondary{% endif %}">{{ u.role }}</span></td>
+            <td><span class="badge {% if u.active %}badge-success{% else %}badge-warning{% endif %}">{{ 'Actif' if u.active else 'Désactivé' }}</span></td>
+            <td>
+              <a href="{{ url_for('toggle_user', uid=u.id) }}" class="btn btn-xs btn-secondary">{{ '🔒' if u.active else '🔓' }}</a>
+              <a href="{{ url_for('delete_user', uid=u.id) }}" class="btn btn-xs btn-danger"
+                 onclick="return confirm('Supprimer {{ u.username }} ?')">🗑</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Clients -->
+    <div class="card">
+      <h3 class="card-title">🏢 Clients</h3>
+      <form method="POST" action="{{ url_for('add_client') }}" class="inline-form">
+        <input type="text" name="client_name" placeholder="Nom du client" required class="form-input"/>
+        <button type="submit" class="btn btn-primary">+ Ajouter</button>
+      </form>
+      <table class="table mt-2">
+        <thead><tr><th>Nom</th><th>Statut</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for c in clients %}
+          <tr>
+            <td>{{ c.name }}</td>
+            <td><span class="badge {% if c.active %}badge-success{% else %}badge-warning{% endif %}">{{ 'Actif' if c.active else 'Inactif' }}</span></td>
+            <td><a href="{{ url_for('toggle_client', cid=c.id) }}" class="btn btn-xs btn-secondary">{{ '🔒' if c.active else '🔓' }}</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Service Templates -->
+    <div class="card">
+      <h3 class="card-title">🏷️ Catalogue des prestations</h3>
+      <form method="POST" action="{{ url_for('add_template') }}" class="inline-form">
+        <input type="text" name="template_name" placeholder="Nom de la prestation" required class="form-input"/>
+        <button type="submit" class="btn btn-primary">+ Ajouter</button>
+      </form>
+      <table class="table mt-2">
+        <thead><tr><th>Prestation</th><th>Statut</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for t in templates %}
+          <tr>
+            <td>{{ t.name }}</td>
+            <td><span class="badge {% if t.active %}badge-success{% else %}badge-warning{% endif %}">{{ 'Actif' if t.active else 'Inactif' }}</span></td>
+            <td><a href="{{ url_for('toggle_template', tid=t.id) }}" class="btn btn-xs btn-secondary">{{ '🔒' if t.active else '🔓' }}</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Assign Services to Clients -->
+    <div class="card">
+      <h3 class="card-title">🔗 Affecter prestations aux clients</h3>
+      <form method="POST" action="{{ url_for('assign_service') }}" class="inline-form">
+        <select name="client_id" class="form-select" required>
+          <option value="">Client</option>
+          {% for c in clients %}
+            <option value="{{ c.id }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+        <select name="template_id" class="form-select" required>
+          <option value="">Prestation</option>
+          {% for t in templates %}
+            <option value="{{ t.id }}">{{ t.name }}</option>
+          {% endfor %}
+        </select>
+        <input type="number" name="monthly_hours" placeholder="Heures/mois" step="0.5" min="0" class="form-input form-input-sm"/>
+        <button type="submit" class="btn btn-primary">+ Affecter</button>
+      </form>
+      <table class="table mt-2">
+        <thead><tr><th>Client</th><th>Prestation</th><th>Quota/mois</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for cs in client_services %}
+          <tr>
+            <td>{{ cs.client_name }}</td>
+            <td>{{ cs.service_name }}</td>
+            <td>
+              <form method="POST" action="{{ url_for('edit_service', csid=cs.id) }}" class="inline-form-mini">
+                <input type="number" name="monthly_hours" value="{{ cs.monthly_hours }}" step="0.5" min="0" class="form-input form-input-xs"/>
+                <button type="submit" class="btn btn-xs btn-success">💾</button>
+              </form>
+            </td>
+            <td>
+              <a href="{{ url_for('delete_service', csid=cs.id) }}" class="btn btn-xs btn-danger"
+                 onclick="return confirm('Supprimer cette affectation ?')">🗑</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Manual Entry -->
+    <div class="card card-full">
+      <h3 class="card-title">✏️ Encodage manuel</h3>
+      <form method="POST" action="{{ url_for('manual_entry') }}" class="manual-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Collaborateur principal</label>
+            <select name="user_id" class="form-select" required>
+              {% for u in users %}
+                <option value="{{ u.id }}">{{ u.username }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" name="date" required class="form-input"/>
+          </div>
+          <div class="form-group">
+            <label>Heure début</label>
+            <input type="time" name="start_hour" required class="form-input"/>
+          </div>
+          <div class="form-group">
+            <label>Heure fin</label>
+            <input type="time" name="end_hour" required class="form-input"/>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Client</label>
+            <select name="client_id" id="manual-client" class="form-select" required onchange="loadManualServices()">
+              <option value="">— Client —</option>
+              {% for c in clients %}
+                <option value="{{ c.id }}">{{ c.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Prestation</label>
+            <select name="template_id" id="manual-service" class="form-select" required>
+              <option value="">— Prestation —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Justification</label>
+            <input type="text" name="justification" placeholder="Optionnel" class="form-input"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Collègues (optionnel)</label>
+          <div class="chips">
+            {% for u in users %}
+              <label class="chip-check">
+                <input type="checkbox" name="colleagues" value="{{ u.id }}"/> {{ u.username }}
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">💾 Enregistrer</button>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function loadManualServices() {
+  const clientId = document.getElementById('manual-client').value;
+  if (!clientId) return;
+  fetch('/admin/get_services_for_client/' + clientId)
+    .then(r => r.json())
+    .then(data => {
+      const sel = document.getElementById('manual-service');
+      sel.innerHTML = '<option value="">— Prestation —</option>';
+      data.forEach(s => {
+        sel.innerHTML += `<option value="${s.template_id}">${s.name}</option>`;
+      });
+    });
+}
+</script>
+{% endblock %}

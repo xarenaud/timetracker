@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="timer-page">
+
+  <!-- FORMULAIRE DE DÉMARRAGE -->
+  <div class="card" id="start-form">
+    <h2 class="page-title">⏱ Nouveau pointage</h2>
+
+    <div class="form-group mb-3">
+      <label class="field-label">Client</label>
+      <select id="client-select" class="form-select form-select-lg" onchange="loadServices()">
+        <option value="">— Sélectionner un client —</option>
+        {% for c in clients %}
+          <option value="{{ c.id }}">{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group mb-3" id="service-group" style="display:none">
+      <label class="field-label">Prestation</label>
+      <select id="service-select" class="form-select form-select-lg" onchange="checkReady()">
+        <option value="">— Sélectionner une prestation —</option>
+      </select>
+    </div>
+
+    <div class="form-group mb-3" id="colleagues-group" style="display:none">
+      <label class="field-label">Collègues (optionnel)</label>
+      <div class="chips" id="colleague-chips">
+        {% for u in users %}
+          {% if u.id != session.user_id %}
+            <div class="chip" data-id="{{ u.id }}" onclick="toggleColleague(this)">{{ u.username }}</div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-full btn-lg" id="start-btn" onclick="startTimer()" disabled>
+      ▶ Démarrer
+    </button>
+  </div>
+
+  <!-- TIMER EN COURS -->
+  <div class="card hidden" id="timer-running">
+    <div class="timer-context" id="timer-context"></div>
+    <div class="timer-display" id="timer-display">00:00:00</div>
+    <div class="pause-info" id="pause-info"></div>
+    <div class="timer-actions">
+      <button class="btn btn-warning btn-lg" id="pause-btn" onclick="togglePause()">⏸ Pause</button>
+      <button class="btn btn-danger btn-lg" onclick="stopTimer()">⏹ Arrêter</button>
+    </div>
+  </div>
+
+  <!-- MODAL JUSTIFICATION -->
+  <div class="modal hidden" id="justify-modal">
+    <div class="modal-box">
+      <h3>⚠️ Dépassement de quota</h3>
+      <p>Cette session dépasse le quota mensuel. Veuillez justifier :</p>
+      <textarea id="justify-text" class="form-input" rows="3" placeholder="Raison du dépassement..."></textarea>
+      <button class="btn btn-primary btn-full mt-2" onclick="confirmStop()">Confirmer l'arrêt</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let timerInterval = null;
+let startTimestamp = null;
+let sessionId = null;
+let clientId = null;
+let templateId = null;
+let serviceId = null;
+let pauseStart = null;
+let totalPauseMs = 0;
+let isPaused = false;
+
+function loadServices() {
+  clientId = document.getElementById('client-select').value;
+  const serviceGroup = document.getElementById('service-group');
+  const colleaguesGroup = document.getElementById('colleagues-group');
+  const startBtn = document.getElementById('start-btn');
+
+  if (!clientId) {
+    serviceGroup.style.display = 'none';
+    colleaguesGroup.style.display = 'none';
+    startBtn.disabled = true;
+    return;
+  }
+
+  fetch('/get_services/' + clientId)
+    .then(r => r.json())
+    .then(data => {
+      const sel = document.getElementById('service-select');
+      sel.innerHTML = '<option value="">— Sélectionner une prestation —</option>';
+      data.forEach(s => {
+        sel.innerHTML += '<option value="' + s.id + '" data-hours="' + s.monthly_hours + '">' + s.name + '</option>';
+      });
+      serviceGroup.style.display = 'block';
+      colleaguesGroup.style.display = 'block';
+      startBtn.disabled = true;
+    });
+}
+
+function checkReady() {
+  const client = document.getElementById('client-select').value;
+  const service = document.getElementById('service-select').value;
+  document.getElementById('start-btn').disabled = !(client && service);
+}
+
+function toggleColleague(el) {
+  el.classList.toggle('chip-active');
+}
+
+function startTimer() {
+  clientId = document.getElementById('client-select').value;
+  serviceId = document.getElementById('service-select').value;
+  if (!clientId || !serviceId) return;
+
+  const colleagues = [...document.querySelectorAll('.chip-active')].map(c => parseInt(c.dataset.id));
+
+  fetch('/start_timer', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ client_id: parseInt(clientId), service_id: parseInt(serviceId), colleagues })
+  })
+  .then(r => r.json())
+  .then(data => {
+    sessionId = data.session_id;
+    templateId = data.template_id;
+    startTimestamp = new Date();
+    totalPauseMs = 0;
+    isPaused = false;
+
+    const clientName = document.getElementById('client-select').selectedOptions[0].text;
+    const serviceName = document.getElementById('service-select').selectedOptions[0].text;
+    const names = [...document.querySelectorAll('.chip-active')].map(c => c.textContent);
+    const allNames = ['{{ session.username }}', ...names];
+
+    let ctx = '<strong>' + clientName + '</strong> — ' + serviceName;
+    if (allNames.length > 1) ctx += '<br><small>' + allNames.join(', ') + '</small>';
+    document.getElementById('timer-context').innerHTML = ctx;
+
+    document.getElementById('start-form').classList.add('hidden');
+    document.getElementById('timer-running').classList.remove('hidden');
+
+    timerInterval = setInterval(updateDisplay, 1000);
+  });
+}
+
+function updateDisplay() {
+  if (isPaused) return;
+  const elapsed = Date.now() - startTimestamp.getTime() - totalPauseMs;
+  const h = Math.floor(elapsed / 3600000);
+  const m = Math.floor((elapsed % 3600000) / 60000);
+  const s = Math.floor((elapsed % 60000) / 1000);
+  document.getElementById('timer-display').textContent =
+    String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+function togglePause() {
+  const btn = document.getElementById('pause-btn');
+  if (!isPaused) {
+    isPaused = true;
+    pauseStart = Date.now();
+    btn.textContent = '▶ Reprendre';
+    btn.classList.remove('btn-warning');
+    btn.classList.add('btn-success');
+    document.getElementById('timer-display').style.opacity = '0.4';
+  } else {
+    isPaused = false;
+    totalPauseMs += Date.now() - pauseStart;
+    pauseStart = null;
+    btn.textContent = '⏸ Pause';
+    btn.classList.remove('btn-success');
+    btn.classList.add('btn-warning');
+    document.getElementById('timer-display').style.opacity = '1';
+    const pm = Math.round(totalPauseMs / 60000);
+    if (pm > 0) document.getElementById('pause-info').textContent = 'Pause cumulée : ' + pm + ' min';
+  }
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+  const pauseMs = isPaused ? (totalPauseMs + (Date.now() - pauseStart)) : totalPauseMs;
+  const pauseMinutes = pauseMs / 60000;
+  document.getElementById('justify-modal').dataset.pause = pauseMinutes;
+
+  const opt = document.getElementById('service-select').selectedOptions[0];
+  const quota = parseFloat(opt.dataset.hours || 0);
+  const elapsedMin = (Date.now() - startTimestamp.getTime() - pauseMs) / 60000;
+
+  if (quota > 0 && elapsedMin > quota * 60) {
+    document.getElementById('justify-modal').classList.remove('hidden');
+  } else {
+    confirmStop();
+  }
+}
+
+function confirmStop() {
+  const justification = document.getElementById('justify-text').value;
+  const pauseMinutes = parseFloat(document.getElementById('justify-modal').dataset.pause || 0);
+  document.getElementById('justify-modal').classList.add('hidden');
+
+  fetch('/stop_timer', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      session_id: sessionId,
+      client_id: parseInt(clientId),
+      template_id: templateId,
+      start_time: startTimestamp.getFullYear() + '-' +
+        String(startTimestamp.getMonth()+1).padStart(2,'0') + '-' +
+        String(startTimestamp.getDate()).padStart(2,'0') + 'T' +
+        String(startTimestamp.getHours()).padStart(2,'0') + ':' +
+        String(startTimestamp.getMinutes()).padStart(2,'0') + ':' +
+        String(startTimestamp.getSeconds()).padStart(2,'0'),
+      pause_minutes: pauseMinutes,
+      justification
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    const h = Math.floor(data.duration_minutes / 60);
+    const m = Math.round(data.duration_minutes % 60);
+    alert('Session enregistrée : ' + h + 'h' + String(m).padStart(2,'0'));
+    location.reload();
+  });
+}
+</script>
+{% endblock %}

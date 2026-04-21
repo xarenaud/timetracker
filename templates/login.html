@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CX-Media TimeTracker — Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body class="login-page">
+  <div class="login-box">
+    <div class="login-logo">⏱</div>
+    <h1 class="login-title">CX-Media<br><span>TimeTracker</span></h1>
+    {% if error %}
+      <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    <form method="POST">
+      <div class="form-group">
+        <input type="text" name="username" placeholder="Nom d'utilisateur" required class="form-input"/>
+      </div>
+      <div class="form-group">
+        <input type="password" name="password" placeholder="Mot de passe" required class="form-input"/>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Se connecter</button>
+    </form>
+  </div>
+</body>
+</html>
