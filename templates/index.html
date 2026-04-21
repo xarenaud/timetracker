@@ -83,6 +83,38 @@ let pauseStart = null;
 let totalPauseMs = 0;
 let isPaused = false;
 
+// Charger les users actifs au chargement
+let activeUsers = {};
+function refreshActiveUsers() {
+  fetch('/active_users')
+    .then(r => r.json())
+    .then(data => {
+      activeUsers = {};
+      data.forEach(u => { activeUsers[u.user_id] = u.client_name; });
+      updateChips();
+    });
+}
+
+function updateChips() {
+  document.querySelectorAll('.chip[data-id]').forEach(chip => {
+    const uid = parseInt(chip.dataset.id);
+    if (activeUsers[uid] !== undefined) {
+      chip.classList.add('chip-busy');
+      chip.classList.remove('chip-active');
+      chip.title = 'En session sur : ' + activeUsers[uid];
+      chip.onclick = function() {
+        alert('⚠️ ' + chip.textContent.trim() + ' est déjà en session sur ' + activeUsers[uid]);
+      };
+    } else {
+      chip.classList.remove('chip-busy');
+      chip.title = '';
+      chip.onclick = function() { toggleColleague(chip); };
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', refreshActiveUsers);
+
 function loadServices() {
   clientId = document.getElementById('client-select').value;
   const serviceGroup = document.getElementById('service-group');

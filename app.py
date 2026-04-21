@@ -281,8 +281,7 @@ def index():
         clients = [dict(r) for r in clients_raw]
         users = [dict(r) for r in users_raw]
 
-    timezone = get_config('timezone', 'Europe/Brussels')
-    return render_template('index.html', clients=clients, users=users, timezone=timezone)
+    return render_template('index.html', clients=clients, users=users)
 
 @app.route('/get_services/<int:client_id>')
 @login_required
@@ -313,7 +312,7 @@ def start_timer():
     conn = get_db()
     c = conn.cursor()
 
-    # Vérification anti-doublon : user déjà en session sur un AUTRE client ?
+    # Vérification anti-doublon : bloquer si déjà en session (peu importe le client)
     all_users = [session['user_id']] + colleagues
     conflicts = []
     for uid in all_users:
@@ -321,14 +320,15 @@ def start_timer():
         existing = c.fetchone()
         if existing:
             existing_client_id = existing[0] if USE_PG else existing['client_id']
-            if int(existing_client_id) != int(client_id):
-                # Récupérer le nom du user et du client en conflit
-                c.execute(f"SELECT username FROM users WHERE id={PLACEHOLDER}", (uid,))
-                urow = c.fetchone()
-                c.execute(f"SELECT name FROM clients WHERE id={PLACEHOLDER}", (existing_client_id,))
-                crow = c.fetchone()
-                uname = urow[0] if USE_PG else urow['username']
-                cname = crow[0] if USE_PG else crow['name']
+            c.execute(f"SELECT username FROM users WHERE id={PLACEHOLDER}", (uid,))
+            urow = c.fetchone()
+            c.execute(f"SELECT name FROM clients WHERE id={PLACEHOLDER}", (existing_client_id,))
+            crow = c.fetchone()
+            uname = urow[0] if USE_PG else urow['username']
+            cname = crow[0] if USE_PG else crow['name']
+            if uid == session['user_id']:
+                conflicts.append(f"Vous êtes déjà en session sur {cname} — arrêtez d'abord ce timer")
+            else:
                 conflicts.append(f"{uname} est déjà en session sur {cname}")
 
     if conflicts:
@@ -544,9 +544,8 @@ def admin():
         templates = [dict(r) for r in templates_raw]
         client_services = [dict(r) for r in cs_raw]
 
-    timezone = get_config('timezone', 'Europe/Brussels')
     return render_template('admin.html', users=users, clients=clients,
-                           templates=templates, client_services=client_services, timezone=timezone)
+                           templates=templates, client_services=client_services)
 
 @app.route('/admin/add_user', methods=['POST'])
 @admin_required
@@ -593,9 +592,25 @@ def add_client():
     conn = get_db()
     c = conn.cursor()
     try:
-        c.execute(f"INSERT INTO clients (name) VALUES ({PLACEHOLDER})", (name,))
+        if USE_PG:
+            c.execute(f"INSERT INTO clients (name) VALUES ({PLACEHOLDER}) RETURNING id", (name,))
+            client_id = c.fetchone()[0]
+        else:
+            c.execute(f"INSERT INTO clients (name) VALUES ({PLACEHOLDER})", (name,))
+            client_id = c.lastrowid
+
+        # Assigner les services cochés
+        c.execute("SELECT id FROM service_templates WHERE active=1")
+        all_templates = c.fetchall()
+        for t in all_templates:
+            tid = t[0] if USE_PG else t['id']
+            if request.form.get(f'selected_{tid}'):
+                hours = float(request.form.get(f'hours_{tid}', 0) or 0)
+                c.execute(f"INSERT INTO client_services (client_id, template_id, monthly_hours) VALUES ({P(3)})",
+                          (client_id, tid, hours))
         conn.commit()
-    except: pass
+    except Exception as e:
+        print(f"Erreur add_client: {e}")
     conn.close()
     return redirect(url_for('admin'))
 
@@ -853,35 +868,24 @@ def get_services_for_client(client_id):
         return jsonify([{'template_id': r[0], 'name': r[1]} for r in rows])
     return jsonify([dict(r) for r in rows])
 
-# ── CONFIG ────────────────────────────────────────────────────────────────────
+# ── CONFIG supprimée — heures gérées côté navigateur ──
 
-def get_config(key, default=''):
+@app.route('/active_users')
+@login_required
+def active_users():
     conn = get_db()
     c = conn.cursor()
-    c.execute(f"SELECT value FROM app_config WHERE key={PLACEHOLDER}", (key,))
-    row = c.fetchone()
+    c.execute(f"""
+        SELECT a.user_id, u.username, cl.name as client_name
+        FROM active_sessions a
+        JOIN users u ON a.user_id = u.id
+        JOIN clients cl ON a.client_id = cl.id
+    """)
+    rows = c.fetchall()
     conn.close()
-    if row:
-        return row[0] if USE_PG else row['value']
-    return default
-
-def set_config(key, value):
-    conn = get_db()
-    c = conn.cursor()
     if USE_PG:
-        c.execute(f"INSERT INTO app_config (key, value) VALUES ({P(2)}) ON CONFLICT (key) DO UPDATE SET value={PLACEHOLDER}",
-                  (key, value, value))
-    else:
-        c.execute(f"INSERT OR REPLACE INTO app_config (key, value) VALUES ({P(2)})", (key, value))
-    conn.commit()
-    conn.close()
-
-@app.route('/admin/save_config', methods=['POST'])
-@admin_required
-def save_config():
-    timezone = request.form.get('timezone', 'Europe/Brussels')
-    set_config('timezone', timezone)
-    return redirect(url_for('admin'))
+        return jsonify([{'user_id': r[0], 'username': r[1], 'client_name': r[2]} for r in rows])
+    return jsonify([{'user_id': r['user_id'], 'username': r['username'], 'client_name': r['client_name']} for r in rows])
 
 if __name__ == '__main__':
     init_db()

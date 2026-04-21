@@ -3,24 +3,6 @@
 <div class="admin-page">
   <h2 class="page-title">⚙️ Administration</h2>
 
-  <!-- Config -->
-  <div class="card" style="margin-bottom:16px">
-    <h3 class="card-title">⚙️ Configuration</h3>
-    <form method="POST" action="{{ url_for('save_config') }}" class="inline-form">
-      <div class="form-group">
-        <label class="field-label">Fuseau horaire</label>
-        <select name="timezone" class="form-select">
-          <option value="Europe/Brussels" {% if timezone == 'Europe/Brussels' %}selected{% endif %}>Europe/Brussels (UTC+1/+2)</option>
-          <option value="Europe/Paris" {% if timezone == 'Europe/Paris' %}selected{% endif %}>Europe/Paris (UTC+1/+2)</option>
-          <option value="Europe/London" {% if timezone == 'Europe/London' %}selected{% endif %}>Europe/London (UTC+0/+1)</option>
-          <option value="America/New_York" {% if timezone == 'America/New_York' %}selected{% endif %}>America/New_York (UTC-5/-4)</option>
-          <option value="UTC" {% if timezone == 'UTC' %}selected{% endif %}>UTC</option>
-        </select>
-      </div>
-      <button type="submit" class="btn btn-primary">💾 Sauvegarder</button>
-    </form>
-  </div>
-
   <div class="admin-grid">
 
     <!-- Users -->
@@ -57,20 +39,65 @@
     <!-- Clients -->
     <div class="card">
       <h3 class="card-title">🏢 Clients</h3>
-      <form method="POST" action="{{ url_for('add_client') }}" class="inline-form">
-        <input type="text" name="client_name" placeholder="Nom du client" required class="form-input"/>
-        <button type="submit" class="btn btn-primary">+ Ajouter</button>
-      </form>
+
+      <!-- Formulaire création client + services -->
+      <div class="mb-3">
+        <button class="btn btn-primary btn-sm" onclick="toggleNewClient()">+ Nouveau client</button>
+      </div>
+      <div id="new-client-box" style="display:none" class="new-client-box">
+        <form method="POST" action="{{ url_for('add_client') }}">
+          <div class="form-group mb-3">
+            <label class="field-label">Nom du client</label>
+            <input type="text" name="client_name" placeholder="Nom du client" required class="form-input"/>
+          </div>
+          <div class="form-group mb-3">
+            <label class="field-label">Services assignés</label>
+            <div class="services-checklist">
+              {% for t in templates %}
+              <div class="service-check-row">
+                <label class="chip-check">
+                  <input type="checkbox" name="selected_{{ t.id }}" value="1"
+                    onchange="toggleHoursNew(this, {{ t.id }})"/>
+                  {{ t.name }}
+                </label>
+                <input type="number" name="hours_{{ t.id }}" placeholder="h/mois"
+                  step="0.5" min="0" class="form-input form-input-xs" disabled/>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          <button type="submit" class="btn btn-success">💾 Créer le client</button>
+          <button type="button" class="btn btn-secondary" onclick="toggleNewClient()">Annuler</button>
+        </form>
+      </div>
+
+      <!-- Liste clients -->
       <table class="table mt-2">
-        <thead><tr><th>Nom</th><th>Statut</th><th>Action</th></tr></thead>
+        <thead><tr><th>Nom</th><th>Statut</th><th>Actions</th></tr></thead>
         <tbody>
           {% for c in clients %}
           <tr>
-            <td>{{ c.name }}</td>
+            <td>
+              <span class="client-name" onclick="toggleClientServices({{ c.id }})">
+                {{ c.name }} <small style="color:#999">▾</small>
+              </span>
+            </td>
             <td><span class="badge {% if c.active %}badge-success{% else %}badge-warning{% endif %}">{{ 'Actif' if c.active else 'Inactif' }}</span></td>
             <td>
               <a href="{{ url_for('toggle_client', cid=c.id) }}" class="btn btn-xs btn-secondary">{{ '🔒' if c.active else '🔓' }}</a>
               <a href="{{ url_for('delete_client', cid=c.id) }}" class="btn btn-xs btn-danger" onclick="return confirm('Supprimer {{ c.name }} ?')">🗑</a>
+            </td>
+          </tr>
+          <!-- Services inline pour ce client -->
+          <tr class="client-services-row hidden" id="cs-row-{{ c.id }}">
+            <td colspan="3">
+              <form method="POST" action="{{ url_for('assign_services_bulk') }}" class="services-inline-form">
+                <input type="hidden" name="client_id" value="{{ c.id }}"/>
+                <div class="services-checklist" id="cs-list-{{ c.id }}">
+                  <div class="loading-msg">Chargement...</div>
+                </div>
+                <button type="submit" class="btn btn-xs btn-success mt-2">💾 Sauvegarder</button>
+              </form>
             </td>
           </tr>
           {% endfor %}
@@ -102,40 +129,7 @@
       </table>
     </div>
 
-    <!-- Assign Services to Clients -->
-    <div class="card card-full">
-      <h3 class="card-title">🔗 Affecter prestations aux clients</h3>
 
-      <!-- Sélection client -->
-      <div class="form-group mb-3">
-        <label class="field-label">Sélectionner un client</label>
-        <select id="assign-client" class="form-select" onchange="loadClientServices()">
-          <option value="">— Choisir un client —</option>
-          {% for c in clients %}
-            <option value="{{ c.id }}">{{ c.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- Formulaire services -->
-      <div id="assign-services-box" style="display:none">
-        <form method="POST" action="{{ url_for('assign_services_bulk') }}" id="assign-form">
-          <input type="hidden" name="client_id" id="assign-client-id"/>
-          <table class="table" id="assign-table">
-            <thead>
-              <tr>
-                <th>✅</th>
-                <th>Prestation</th>
-                <th>Heures / mois</th>
-              </tr>
-            </thead>
-            <tbody id="assign-tbody">
-            </tbody>
-          </table>
-          <button type="submit" class="btn btn-primary mt-2">💾 Valider toutes les affectations</button>
-        </form>
-      </div>
-    </div>
 
     <!-- Manual Entry -->
     <div class="card card-full">
@@ -219,44 +213,78 @@ function loadManualServices() {
 {% endblock %}
 
 <script>
-function loadClientServices() {
-  const clientId = document.getElementById('assign-client').value;
-  if (!clientId) {
-    document.getElementById('assign-services-box').style.display = 'none';
-    return;
+// Nouveau client - toggle form
+function toggleNewClient() {
+  const box = document.getElementById('new-client-box');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+
+// Nouveau client - toggle heures
+function toggleHoursNew(checkbox, templateId) {
+  const input = document.querySelector('input[name="hours_' + templateId + '"]');
+  if (input) {
+    input.disabled = !checkbox.checked;
+    if (!checkbox.checked) input.value = '';
   }
+}
 
-  document.getElementById('assign-client-id').value = clientId;
+// Client existant - afficher/masquer ses services
+function toggleClientServices(clientId) {
+  const row = document.getElementById('cs-row-' + clientId);
+  if (row.classList.contains('hidden')) {
+    row.classList.remove('hidden');
+    loadClientServicesInline(clientId);
+  } else {
+    row.classList.add('hidden');
+  }
+}
 
+// Charger les services d'un client existant
+function loadClientServicesInline(clientId) {
+  const container = document.getElementById('cs-list-' + clientId);
   fetch('/admin/get_client_assignments/' + clientId)
     .then(r => r.json())
     .then(data => {
-      const tbody = document.getElementById('assign-tbody');
-      tbody.innerHTML = '';
-
+      container.innerHTML = '';
       data.forEach(s => {
         const checked = s.assigned ? 'checked' : '';
         const hours = s.monthly_hours || '';
-        tbody.innerHTML += `
-          <tr>
-            <td><input type="checkbox" name="selected_${s.template_id}" value="1" ${checked} onchange="toggleHours(this, ${s.template_id})"/></td>
-            <td>${s.name}</td>
-            <td>
-              <input type="number" name="hours_${s.template_id}" value="${hours}"
-                step="0.5" min="0" placeholder="0"
-                class="form-input form-input-xs"
-                ${s.assigned ? '' : 'disabled'}/>
-            </td>
-          </tr>`;
+        const disabled = s.assigned ? '' : 'disabled';
+        container.innerHTML +=
+          '<div class="service-check-row">' +
+            '<label class="chip-check">' +
+              '<input type="checkbox" name="selected_' + s.template_id + '" value="1" ' + checked +
+                ' onchange="toggleHoursInline(this, ' + clientId + ', ' + s.template_id + ')"/>' +
+              ' ' + s.name +
+            '</label>' +
+            '<input type="number" name="hours_' + s.template_id + '" value="' + hours + '"' +
+              ' step="0.5" min="0" placeholder="h/mois"' +
+              ' class="form-input form-input-xs" ' + disabled + '/>' +
+          '</div>';
       });
-
-      document.getElementById('assign-services-box').style.display = 'block';
     });
 }
 
-function toggleHours(checkbox, templateId) {
-  const hoursInput = document.querySelector(`input[name="hours_${templateId}"]`);
-  hoursInput.disabled = !checkbox.checked;
-  if (!checkbox.checked) hoursInput.value = '';
+function toggleHoursInline(checkbox, clientId, templateId) {
+  const form = document.querySelector('#cs-row-' + clientId + ' form');
+  const input = form.querySelector('input[name="hours_' + templateId + '"]');
+  if (input) {
+    input.disabled = !checkbox.checked;
+    if (!checkbox.checked) input.value = '';
+  }
+}
+
+function loadManualServices() {
+  const clientId = document.getElementById('manual-client').value;
+  if (!clientId) return;
+  fetch('/admin/get_services_for_client/' + clientId)
+    .then(r => r.json())
+    .then(data => {
+      const sel = document.getElementById('manual-service');
+      sel.innerHTML = '<option value="">— Prestation —</option>';
+      data.forEach(s => {
+        sel.innerHTML += '<option value="' + s.template_id + '">' + s.name + '</option>';
+      });
+    });
 }
 </script>

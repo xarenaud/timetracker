@@ -432,3 +432,60 @@ body {
   .timer-actions .btn { font-size: 15px; padding: 13px 16px; }
   .form-select-lg { font-size: 15px; }
 }
+
+/* ── ADMIN CLIENTS SERVICES ── */
+.new-client-box {
+  background: var(--gris);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1.5px solid var(--gris-bord);
+}
+.services-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.service-check-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.service-check-row .chip-check {
+  flex: 1;
+  min-width: 160px;
+}
+.client-name {
+  cursor: pointer;
+  color: var(--bordeaux);
+  font-weight: 600;
+}
+.client-name:hover { text-decoration: underline; }
+.client-services-row td {
+  background: #f9f9f9 !important;
+  padding: 12px 16px !important;
+}
+.services-inline-form { padding: 4px 0; }
+.btn-sm { padding: 8px 14px; font-size: 13px; }
+.loading-msg { color: var(--text-light); font-style: italic; font-size: 13px; }
+
+/* Chip active dans admin */
+.chip-check input:checked + span,
+.chip-check:has(input:checked) {
+  color: var(--bordeaux);
+  font-weight: 700;
+}
+
+/* ── CHIP BUSY (collègue en session) ── */
+.chip-busy {
+  background: #f5f5f5 !important;
+  color: #aaa !important;
+  border-color: #ddd !important;
+  cursor: not-allowed !important;
+  position: relative;
+}
+.chip-busy::after {
+  content: ' 🔴';
+  font-size: 10px;
+}
