@@ -41,17 +41,15 @@
       <h3 class="card-title">🏢 Clients</h3>
 
       <!-- Formulaire création client + services -->
-      <div class="mb-3">
-        <button class="btn btn-primary btn-sm" onclick="toggleNewClient()">+ Nouveau client</button>
-      </div>
-      <div id="new-client-box" style="display:none" class="new-client-box">
+      <div class="new-client-box">
         <form method="POST" action="{{ url_for('add_client') }}">
           <div class="form-group mb-3">
             <label class="field-label">Nom du client</label>
             <input type="text" name="client_name" placeholder="Nom du client" required class="form-input"/>
           </div>
+          {% if templates %}
           <div class="form-group mb-3">
-            <label class="field-label">Services assignés</label>
+            <label class="field-label">Services assignés (optionnel)</label>
             <div class="services-checklist">
               {% for t in templates %}
               <div class="service-check-row">
@@ -66,8 +64,8 @@
               {% endfor %}
             </div>
           </div>
-          <button type="submit" class="btn btn-success">💾 Créer le client</button>
-          <button type="button" class="btn btn-secondary" onclick="toggleNewClient()">Annuler</button>
+          {% endif %}
+          <button type="submit" class="btn btn-primary">+ Créer le client</button>
         </form>
       </div>
 
