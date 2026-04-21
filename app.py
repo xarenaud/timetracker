@@ -5,9 +5,14 @@ import os, hashlib, math
 app = Flask(__name__)
 app.secret_key = 'cxmedia-secret-2024'
 
+@app.before_request
+def log_db_mode():
+    pass  # DB mode logged at startup
+
 # ── DATABASE ──────────────────────────────────────────────────────────────────
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
+print(f"[STARTUP] DATABASE_URL={'SET ('+DATABASE_URL[:30]+'...)' if DATABASE_URL else 'NOT SET - using SQLite'}")
 
 if DATABASE_URL:
     # PostgreSQL sur Railway
@@ -891,4 +896,6 @@ if __name__ == '__main__':
     init_db()
     print("✅ CX-Media TimeTracker v4 — http://127.0.0.1:8080")
     print("   Login: admin / admin123")
+    print(f"   DB Mode: {'PostgreSQL' if USE_PG else 'SQLite'}")
+    print(f"   DATABASE_URL: {'SET' if DATABASE_URL else 'NOT SET'}")
     app.run(debug=True, host='0.0.0.0', port=8080)
