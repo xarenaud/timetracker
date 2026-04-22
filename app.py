@@ -948,6 +948,50 @@ def get_services_for_client(client_id):
 
 # ── CONFIG supprimée — heures gérées côté navigateur ──
 
+@app.route('/my_active_session')
+@login_required
+def my_active_session():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(f"""
+        SELECT a.session_id, a.client_id, a.started_at,
+               cl.name as client_name
+        FROM active_sessions a
+        JOIN clients cl ON a.client_id = cl.id
+        WHERE a.user_id = {PLACEHOLDER}
+    """, (session['user_id'],))
+    row = c.fetchone()
+
+    if not row:
+        conn.close()
+        return jsonify({'active': False})
+
+    if USE_PG:
+        session_id, client_id, started_at, client_name = row[0], row[1], row[2], row[3]
+    else:
+        session_id, client_id, started_at, client_name = row['session_id'], row['client_id'], row['started_at'], row['client_name']
+
+    # Récupérer les services de cette session
+    c.execute(f"""
+        SELECT cs.id as cs_id, st.name as service_name, cs.template_id
+        FROM client_services cs
+        JOIN service_templates st ON cs.template_id = st.id
+        WHERE cs.client_id = {PLACEHOLDER}
+    """, (client_id,))
+    services = c.fetchall()
+    conn.close()
+
+    return jsonify({
+        'active': True,
+        'session_id': session_id,
+        'client_id': client_id,
+        'client_name': client_name,
+        'started_at': str(started_at),
+        'services': [{'id': r[0] if USE_PG else r['cs_id'],
+                      'name': r[1] if USE_PG else r['service_name'],
+                      'template_id': r[2] if USE_PG else r['template_id']} for r in services]
+    })
+
 @app.route('/active_users')
 @login_required
 def active_users():

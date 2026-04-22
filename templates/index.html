@@ -2,6 +2,18 @@
 {% block content %}
 <div class="timer-page">
 
+  <!-- SESSION EN COURS (si existante) -->
+  <div class="card hidden" id="resume-session">
+    <div class="alert-session">
+      ⚠️ Tu as une session en cours non terminée !
+    </div>
+    <div class="timer-context" id="resume-context"></div>
+    <div class="timer-display" id="resume-display">00:00:00</div>
+    <div class="timer-actions">
+      <button class="btn btn-danger btn-lg" onclick="forceStop()">⏹ Terminer cette session</button>
+    </div>
+  </div>
+
   <!-- FORMULAIRE DE DÉMARRAGE -->
   <div class="card" id="start-form">
     <h2 class="page-title">⏱ Nouveau pointage</h2>
@@ -82,6 +94,81 @@ let serviceId = null;
 let pauseStart = null;
 let totalPauseMs = 0;
 let isPaused = false;
+
+// ── REPRISE SESSION ACTIVE ──────────────────────────────────────────────────
+let resumeSessionId = null;
+let resumeClientId = null;
+let resumeTemplateId = null;
+let resumeStartTime = null;
+let resumeInterval = null;
+
+function checkActiveSession() {
+  fetch('/my_active_session')
+    .then(r => r.json())
+    .then(data => {
+      if (data.active) {
+        resumeSessionId = data.session_id;
+        resumeClientId = data.client_id;
+        resumeStartTime = new Date(data.started_at);
+
+        // Afficher le service (premier de la liste)
+        const svc = data.services.length > 0 ? data.services[0] : null;
+        if (svc) resumeTemplateId = svc.template_id;
+
+        const svcName = svc ? svc.name : 'Prestation inconnue';
+        document.getElementById('resume-context').innerHTML =
+          '<strong>' + data.client_name + '</strong> — ' + svcName +
+          '<br><small>Démarrée le ' + resumeStartTime.toLocaleDateString('fr-BE') +
+          ' à ' + resumeStartTime.toLocaleTimeString('fr-BE', {hour:'2-digit', minute:'2-digit'}) + '</small>';
+
+        document.getElementById('resume-session').classList.remove('hidden');
+        document.getElementById('start-form').classList.add('hidden');
+
+        resumeInterval = setInterval(updateResumeDisplay, 1000);
+      }
+    });
+}
+
+function updateResumeDisplay() {
+  const elapsed = Date.now() - resumeStartTime.getTime();
+  const h = Math.floor(elapsed / 3600000);
+  const m = Math.floor((elapsed % 3600000) / 60000);
+  const s = Math.floor((elapsed % 60000) / 1000);
+  document.getElementById('resume-display').textContent =
+    String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+function forceStop() {
+  if (!confirm('Confirmes-tu la fin de cette session ?')) return;
+  clearInterval(resumeInterval);
+  const endTimestamp = new Date();
+  const pauseMinutes = 0;
+
+  fetch('/stop_timer', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      session_id: resumeSessionId,
+      client_id: resumeClientId,
+      template_id: resumeTemplateId,
+      start_time: localISO(resumeStartTime),
+      end_time: localISO(endTimestamp),
+      pause_minutes: pauseMinutes,
+      justification: 'Session reprise après déconnexion'
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    const h = Math.floor(data.duration_minutes / 60);
+    const m = Math.round(data.duration_minutes % 60);
+    alert('Session terminée : ' + h + 'h' + String(m).padStart(2,'0'));
+    location.reload();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  checkActiveSession();
+});
 
 // Charger les users actifs au chargement
 let activeUsers = {};
