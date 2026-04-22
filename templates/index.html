@@ -62,6 +62,14 @@
     </div>
   </div>
 
+  <!-- SESSIONS EN COURS -->
+  <div class="card" id="live-sessions-card">
+    <h3 class="card-title">🟢 Sessions en cours</h3>
+    <div id="live-sessions-list">
+      <p class="empty-msg">Aucune session active.</p>
+    </div>
+  </div>
+
   <!-- MODAL JUSTIFICATION -->
   <div class="modal hidden" id="justify-modal">
     <div class="modal-box">
@@ -168,7 +176,38 @@ function forceStop() {
 
 document.addEventListener('DOMContentLoaded', () => {
   checkActiveSession();
+  refreshLiveSessions();
+  setInterval(refreshLiveSessions, 30000); // Rafraîchir toutes les 30 secondes
 });
+
+function refreshLiveSessions() {
+  fetch('/active_users')
+    .then(r => r.json())
+    .then(data => {
+      const container = document.getElementById('live-sessions-list');
+      if (data.length === 0) {
+        container.innerHTML = '<p class="empty-msg">Aucune session active.</p>';
+        return;
+      }
+      let html = '<div class="live-sessions-grid">';
+      data.forEach(u => {
+        const started = new Date(u.started_at);
+        const elapsed = Date.now() - started.getTime();
+        const h = Math.floor(elapsed / 3600000);
+        const m = Math.floor((elapsed % 3600000) / 60000);
+        const duration = h + 'h' + String(m).padStart(2,'0');
+        const isMe = u.user_id === {{ session.user_id }};
+        html += '<div class="live-session-chip' + (isMe ? ' live-session-me' : '') + '">' +
+          '<span class="live-dot">🟢</span>' +
+          '<strong>' + u.username + '</strong>' +
+          '<span class="live-client">' + u.client_name + '</span>' +
+          '<span class="live-duration">⏱ ' + duration + '</span>' +
+          '</div>';
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    });
+}
 
 // Charger les users actifs au chargement
 let activeUsers = {};

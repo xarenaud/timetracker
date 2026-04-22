@@ -998,16 +998,29 @@ def active_users():
     conn = get_db()
     c = conn.cursor()
     c.execute(f"""
-        SELECT a.user_id, u.username, cl.name as client_name
+        SELECT a.user_id, u.username, cl.name as client_name,
+               st.name as service_name, a.started_at
         FROM active_sessions a
         JOIN users u ON a.user_id = u.id
         JOIN clients cl ON a.client_id = cl.id
+        LEFT JOIN client_services cs ON cs.client_id = a.client_id
+        LEFT JOIN service_templates st ON cs.template_id = st.id
+        ORDER BY a.started_at ASC
     """)
     rows = c.fetchall()
     conn.close()
-    if USE_PG:
-        return jsonify([{'user_id': r[0], 'username': r[1], 'client_name': r[2]} for r in rows])
-    return jsonify([{'user_id': r['user_id'], 'username': r['username'], 'client_name': r['client_name']} for r in rows])
+    seen = set()
+    result = []
+    for r in rows:
+        if USE_PG:
+            uid, uname, cname, sname, started = r[0], r[1], r[2], r[3], str(r[4])
+        else:
+            uid, uname, cname, sname, started = r['user_id'], r['username'], r['client_name'], r['service_name'], r['started_at']
+        if uid not in seen:
+            seen.add(uid)
+            result.append({'user_id': uid, 'username': uname, 'client_name': cname,
+                          'service_name': sname or '', 'started_at': started})
+    return jsonify(result)
 
 
 # ── DASHBOARD ─────────────────────────────────────────────────────────────────
