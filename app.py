@@ -21,6 +21,10 @@ if DATABASE_URL:
     if DATABASE_URL.startswith('postgres://'):
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
+    # Ajouter SSL si pas déjà présent
+    if '?sslmode=' not in DATABASE_URL and 'sslmode=' not in DATABASE_URL:
+        DATABASE_URL = DATABASE_URL + '?sslmode=require'
+
     def get_db():
         conn = psycopg2.connect(DATABASE_URL)
         return conn
@@ -108,6 +112,12 @@ def init_db():
             key TEXT PRIMARY KEY,
             value TEXT
         )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS collaborator_settings (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER UNIQUE NOT NULL,
+            hourly_cost REAL DEFAULT 0,
+            vendable_hours REAL DEFAULT 0
+        )''')
     else:
         c.execute('''CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,6 +171,12 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS app_config (
             key TEXT PRIMARY KEY,
             value TEXT
+        )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS collaborator_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER UNIQUE NOT NULL,
+            hourly_cost REAL DEFAULT 0,
+            vendable_hours REAL DEFAULT 0
         )''')
 
     # Admin par défaut
@@ -899,3 +915,174 @@ if __name__ == '__main__':
     print(f"   DB Mode: {'PostgreSQL' if USE_PG else 'SQLite'}")
     print(f"   DATABASE_URL: {'SET' if DATABASE_URL else 'NOT SET'}")
     app.run(debug=True, host='0.0.0.0', port=8080)
+
+# ── DASHBOARD ─────────────────────────────────────────────────────────────────
+
+@app.route('/dashboard')
+@admin_required
+def dashboard():
+    conn = get_db()
+    c = conn.cursor()
+
+    # Paramètres filtre
+    month = request.args.get('month', datetime.now().strftime('%Y-%m'))
+    user_filter = request.args.get('user_id', '')
+
+    # Users actifs
+    c.execute("SELECT id, username FROM users WHERE active=1 ORDER BY username")
+    users_raw = c.fetchall()
+    users = [{'id': r[0], 'username': r[1]} for r in users_raw] if USE_PG else [dict(r) for r in users_raw]
+
+    # Settings collaborateurs
+    c.execute(f"SELECT user_id, hourly_cost, vendable_hours FROM collaborator_settings")
+    settings_raw = c.fetchall()
+    settings = {}
+    for r in settings_raw:
+        if USE_PG:
+            settings[r[0]] = {'hourly_cost': r[1], 'vendable_hours': r[2]}
+        else:
+            settings[r['user_id']] = {'hourly_cost': r['hourly_cost'], 'vendable_hours': r['vendable_hours']}
+
+    TARIF = 75.0
+
+    # Heures prestées par user ce mois
+    query_sql = f"""
+        SELECT te.user_id, u.username,
+               SUM(te.duration_minutes) as total_minutes,
+               te.client_id, c.name as client_name,
+               te.template_id, st.name as service_name
+        FROM time_entries te
+        JOIN users u ON te.user_id = u.id
+        JOIN clients c ON te.client_id = c.id
+        JOIN service_templates st ON te.template_id = st.id
+        WHERE {'TO_CHAR(CAST(te.start_time AS TIMESTAMP),' + PLACEHOLDER + ')' if USE_PG else "strftime('%Y-%m', te.start_time)"} = {PLACEHOLDER}
+    """
+    params = ['YYYY-MM', month] if USE_PG else [month]
+
+    if user_filter:
+        query_sql += f" AND te.user_id = {PLACEHOLDER}"
+        params.append(user_filter)
+
+    query_sql += " GROUP BY te.user_id, u.username, te.client_id, c.name, te.template_id, st.name"
+    c.execute(query_sql, params)
+    rows = c.fetchall()
+
+    # Construire stats par collaborateur
+    collab_stats = {}
+    client_stats = {}
+
+    for r in rows:
+        if USE_PG:
+            uid, uname, total_min, cid, cname, tid, sname = r[0], r[1], r[2], r[3], r[4], r[5], r[6]
+        else:
+            uid, uname, total_min = r['user_id'], r['username'], r['total_minutes']
+            cid, cname = r['client_id'], r['client_name']
+            tid, sname = r['template_id'], r['service_name']
+
+        total_h = (total_min or 0) / 60
+        s = settings.get(uid, {'hourly_cost': 0, 'vendable_hours': 0})
+        hourly_cost = s['hourly_cost']
+        vendable_h = s['vendable_hours']
+
+        # Stats collaborateur
+        if uid not in collab_stats:
+            collab_stats[uid] = {
+                'username': uname,
+                'total_hours': 0,
+                'vendable_hours': vendable_h,
+                'hourly_cost': hourly_cost,
+                'ca_realise': 0,
+                'ca_attendu': vendable_h * TARIF,
+                'cout_total': 0,
+                'marge': 0
+            }
+        collab_stats[uid]['total_hours'] += total_h
+        collab_stats[uid]['ca_realise'] += total_h * TARIF
+        collab_stats[uid]['cout_total'] += total_h * hourly_cost
+
+    # Calculer marge finale par collab
+    for uid in collab_stats:
+        cs = collab_stats[uid]
+        cs['marge'] = cs['ca_realise'] - cs['cout_total']
+        cs['taux_realisation'] = round((cs['total_hours'] / cs['vendable_hours'] * 100), 1) if cs['vendable_hours'] > 0 else 0
+
+    # Stats par client (budget vs presté)
+    c.execute(f"""
+        SELECT cs.client_id, cl.name, cs.template_id, st.name as sname, cs.monthly_hours,
+               COALESCE(SUM(te.duration_minutes), 0) as total_min
+        FROM client_services cs
+        JOIN clients cl ON cs.client_id = cl.id
+        JOIN service_templates st ON cs.template_id = st.id
+        LEFT JOIN time_entries te ON te.client_id = cs.client_id
+            AND te.template_id = cs.template_id
+            AND {'TO_CHAR(CAST(te.start_time AS TIMESTAMP),' + PLACEHOLDER + ')' if USE_PG else "strftime('%Y-%m', te.start_time)"} = {PLACEHOLDER}
+        GROUP BY cs.client_id, cl.name, cs.template_id, st.name, cs.monthly_hours
+        ORDER BY cl.name
+    """, (['YYYY-MM', month] if USE_PG else [month]))
+
+    client_rows = c.fetchall()
+    client_stats = {}
+    for r in client_rows:
+        if USE_PG:
+            cid, cname, tid, sname, quota_h, total_min = r[0], r[1], r[2], r[3], r[4], r[5]
+        else:
+            cid, cname = r['client_id'], r['name']
+            tid, sname = r['template_id'], r['sname']
+            quota_h, total_min = r['monthly_hours'], r['total_min']
+
+        if cid not in client_stats:
+            client_stats[cid] = {
+                'name': cname,
+                'budget': 0,
+                'ca_realise': 0,
+                'hours_quota': 0,
+                'hours_prested': 0,
+                'services': []
+            }
+
+        prested_h = (total_min or 0) / 60
+        budget = quota_h * TARIF
+        ca_realise = prested_h * TARIF
+        taux_horaire = budget / prested_h if prested_h > 0 else 0
+
+        client_stats[cid]['budget'] += budget
+        client_stats[cid]['ca_realise'] += ca_realise
+        client_stats[cid]['hours_quota'] += quota_h
+        client_stats[cid]['hours_prested'] += prested_h
+        client_stats[cid]['services'].append({
+            'name': sname,
+            'quota_h': quota_h,
+            'prested_h': round(prested_h, 2),
+            'budget': budget,
+            'taux_horaire': round(taux_horaire, 2)
+        })
+
+    conn.close()
+
+    return render_template('dashboard.html',
+        users=users, settings=settings,
+        collab_stats=collab_stats,
+        client_stats=client_stats,
+        month=month, user_filter=user_filter,
+        TARIF=TARIF)
+
+@app.route('/dashboard/save_settings', methods=['POST'])
+@admin_required
+def save_collab_settings():
+    conn = get_db()
+    c = conn.cursor()
+    users_ids = request.form.getlist('user_ids')
+    for uid in users_ids:
+        cost = float(request.form.get(f'cost_{uid}', 0) or 0)
+        hours = float(request.form.get(f'hours_{uid}', 0) or 0)
+        if USE_PG:
+            c.execute(f"""INSERT INTO collaborator_settings (user_id, hourly_cost, vendable_hours)
+                VALUES ({P(3)})
+                ON CONFLICT (user_id) DO UPDATE SET hourly_cost={PLACEHOLDER}, vendable_hours={PLACEHOLDER}""",
+                (uid, cost, hours, cost, hours))
+        else:
+            c.execute(f"""INSERT OR REPLACE INTO collaborator_settings (user_id, hourly_cost, vendable_hours)
+                VALUES ({P(3)})""", (uid, cost, hours))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('dashboard'))

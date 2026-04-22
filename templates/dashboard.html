@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="dashboard-page">
+
+  <h2 class="page-title">📊 Dashboard Rentabilité</h2>
+
+  <!-- Filtres -->
+  <div class="card">
+    <form method="GET" class="filter-form">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label>Mois</label>
+          <input type="month" name="month" value="{{ month }}" class="form-input"/>
+        </div>
+        <div class="filter-group">
+          <label>Collaborateur</label>
+          <select name="user_id" class="form-select">
+            <option value="">Tous</option>
+            {% for u in users %}
+              <option value="{{ u.id }}" {% if user_filter == u.id|string %}selected{% endif %}>{{ u.username }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="filter-group" style="justify-content:flex-end;flex-direction:row;align-items:flex-end;gap:8px">
+          <button type="submit" class="btn btn-primary">🔍 Filtrer</button>
+          <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">✖ Reset</a>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- KPIs globaux -->
+  {% set total_ca_attendu = collab_stats.values() | sum(attribute='ca_attendu') %}
+  {% set total_ca_realise = collab_stats.values() | sum(attribute='ca_realise') %}
+  {% set total_marge = collab_stats.values() | sum(attribute='marge') %}
+  {% set total_cout = collab_stats.values() | sum(attribute='cout_total') %}
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">CA Attendu</div>
+      <div class="kpi-value">{{ "%.0f"|format(total_ca_attendu) }}€</div>
+      <div class="kpi-sub">{{ TARIF }}€/h × heures vendables</div>
+    </div>
+    <div class="kpi-card kpi-{{ 'green' if total_ca_realise >= total_ca_attendu else 'orange' }}">
+      <div class="kpi-label">CA Réalisé</div>
+      <div class="kpi-value">{{ "%.0f"|format(total_ca_realise) }}€</div>
+      <div class="kpi-sub">{{ "%.0f"|format((total_ca_realise / total_ca_attendu * 100) if total_ca_attendu > 0 else 0) }}% de l'objectif</div>
+    </div>
+    <div class="kpi-card kpi-{{ 'green' if total_marge > 0 else 'red' }}">
+      <div class="kpi-label">Marge Totale</div>
+      <div class="kpi-value">{{ "%.0f"|format(total_marge) }}€</div>
+      <div class="kpi-sub">CA réalisé - coûts salariaux</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Coûts Salariaux</div>
+      <div class="kpi-value">{{ "%.0f"|format(total_cout) }}€</div>
+      <div class="kpi-sub">Heures prestées × coût/h</div>
+    </div>
+  </div>
+
+  <!-- Graphiques -->
+  <div class="charts-grid">
+
+    <!-- Graphique CA Attendu vs Réalisé par collaborateur -->
+    <div class="card">
+      <h3 class="card-title">📈 CA Attendu vs Réalisé par collaborateur</h3>
+      <canvas id="chartCollab" height="200"></canvas>
+    </div>
+
+    <!-- Graphique Rentabilité clients -->
+    <div class="card">
+      <h3 class="card-title">🏢 Budget vs Heures prestées par client</h3>
+      <canvas id="chartClients" height="200"></canvas>
+    </div>
+
+  </div>
+
+  <!-- Stats collaborateurs -->
+  <div class="card">
+    <h3 class="card-title">👥 Performance collaborateurs — {{ month }}</h3>
+    {% if collab_stats %}
+    <div class="table-scroll">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Collaborateur</th>
+          <th>H. vendables/mois</th>
+          <th>H. prestées</th>
+          <th>Taux réalisation</th>
+          <th>CA Attendu</th>
+          <th>CA Réalisé</th>
+          <th>Coût salarial</th>
+          <th>Marge</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for uid, cs in collab_stats.items() %}
+        {% set taux = cs.taux_realisation %}
+        <tr>
+          <td><strong>{{ cs.username }}</strong></td>
+          <td>{{ cs.vendable_hours }}h</td>
+          <td>{{ "%.1f"|format(cs.total_hours) }}h</td>
+          <td>
+            <div class="progress-bar-wrap">
+              <div class="progress-bar {{ 'bg-green' if taux >= 100 else 'bg-orange' if taux >= 70 else 'bg-red' }}"
+                   style="width:{{ [taux, 100]|min }}%"></div>
+            </div>
+            <span class="pct-label">{{ taux }}%</span>
+          </td>
+          <td>{{ "%.0f"|format(cs.ca_attendu) }}€</td>
+          <td>{{ "%.0f"|format(cs.ca_realise) }}€</td>
+          <td>{{ "%.0f"|format(cs.cout_total) }}€</td>
+          <td class="{{ 'text-green' if cs.marge > 0 else 'text-red' }}"><strong>{{ "%.0f"|format(cs.marge) }}€</strong></td>
+          <td>
+            {% if taux >= 100 %}
+              <span class="badge badge-success">🟢 OK</span>
+            {% elif taux >= 70 %}
+              <span class="badge badge-warning">🟡 Attention</span>
+            {% else %}
+              <span class="badge badge-danger">🔴 Critique</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+      <p class="empty-msg">Aucune donnée pour ce mois.</p>
+    {% endif %}
+  </div>
+
+  <!-- Stats clients -->
+  <div class="card">
+    <h3 class="card-title">🏢 Rentabilité clients — {{ month }}</h3>
+    {% if client_stats %}
+    <div class="table-scroll">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Budget (quota)</th>
+          <th>H. quota</th>
+          <th>H. prestées</th>
+          <th>Taux horaire réalisé</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cid, cs in client_stats.items() %}
+        {% set taux_h = (cs.budget / cs.hours_prested) if cs.hours_prested > 0 else TARIF %}
+        <tr>
+          <td><strong>{{ cs.name }}</strong></td>
+          <td>{{ "%.0f"|format(cs.budget) }}€</td>
+          <td>{{ cs.hours_quota }}h</td>
+          <td>{{ "%.1f"|format(cs.hours_prested) }}h</td>
+          <td>
+            <strong>{{ "%.2f"|format(taux_h) }}€/h</strong>
+            <small class="{{ 'text-green' if taux_h >= TARIF else 'text-orange' if taux_h >= 35 else 'text-red' }}">
+              (target {{ TARIF }}€/h)
+            </small>
+          </td>
+          <td>
+            {% if taux_h >= TARIF %}
+              <span class="badge badge-success">🟢 Excellent</span>
+            {% elif taux_h >= 35 %}
+              <span class="badge badge-warning">🟡 Acceptable</span>
+            {% else %}
+              <span class="badge badge-danger">🔴 Danger</span>
+            {% endif %}
+          </td>
+        </tr>
+        <!-- Détail services -->
+        {% for svc in cs.services %}
+        <tr class="service-detail-row">
+          <td style="padding-left:24px;color:#999">↳ {{ svc.name }}</td>
+          <td>{{ "%.0f"|format(svc.budget) }}€</td>
+          <td>{{ svc.quota_h }}h</td>
+          <td>{{ svc.prested_h }}h</td>
+          <td>
+            {% if svc.prested_h > 0 %}
+              {{ "%.2f"|format(svc.taux_horaire) }}€/h
+            {% else %}—{% endif %}
+          </td>
+          <td></td>
+        </tr>
+        {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+      <p class="empty-msg">Aucune donnée pour ce mois.</p>
+    {% endif %}
+  </div>
+
+  <!-- Paramètres collaborateurs -->
+  <div class="card">
+    <h3 class="card-title">⚙️ Paramètres collaborateurs</h3>
+    <form method="POST" action="{{ url_for('save_collab_settings') }}">
+      <input type="hidden" name="month" value="{{ month }}"/>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Collaborateur</th>
+            <th>Coût horaire (€/h)</th>
+            <th>Heures vendables/mois</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <input type="hidden" name="user_ids" value="{{ u.id }}"/>
+          <tr>
+            <td><strong>{{ u.username }}</strong></td>
+            <td>
+              <input type="number" name="cost_{{ u.id }}"
+                value="{{ settings[u.id].hourly_cost if u.id in settings else '' }}"
+                step="0.5" min="0" placeholder="€/h" class="form-input form-input-sm"/>
+            </td>
+            <td>
+              <input type="number" name="hours_{{ u.id }}"
+                value="{{ settings[u.id].vendable_hours if u.id in settings else '' }}"
+                step="0.5" min="0" placeholder="h/mois" class="form-input form-input-sm"/>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button type="submit" class="btn btn-primary mt-2">💾 Sauvegarder les paramètres</button>
+    </form>
+  </div>
+
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Données collaborateurs
+const collabLabels = [{% for uid, cs in collab_stats.items() %}"{{ cs.username }}",{% endfor %}];
+const collabAttendu = [{% for uid, cs in collab_stats.items() %}{{ "%.0f"|format(cs.ca_attendu) }},{% endfor %}];
+const collabRealise = [{% for uid, cs in collab_stats.items() %}{{ "%.0f"|format(cs.ca_realise) }},{% endfor %}];
+
+new Chart(document.getElementById('chartCollab'), {
+  type: 'bar',
+  data: {
+    labels: collabLabels,
+    datasets: [
+      { label: 'CA Attendu', data: collabAttendu, backgroundColor: 'rgba(123,28,46,0.3)', borderColor: '#7B1C2E', borderWidth: 2 },
+      { label: 'CA Réalisé', data: collabRealise, backgroundColor: 'rgba(46,125,50,0.5)', borderColor: '#2e7d32', borderWidth: 2 }
+    ]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
+});
+
+// Données clients
+const clientLabels = [{% for cid, cs in client_stats.items() %}"{{ cs.name }}",{% endfor %}];
+const clientBudget = [{% for cid, cs in client_stats.items() %}{{ "%.0f"|format(cs.budget) }},{% endfor %}];
+const clientPreste = [{% for cid, cs in client_stats.items() %}{{ "%.0f"|format(cs.ca_realise) }},{% endfor %}];
+
+new Chart(document.getElementById('chartClients'), {
+  type: 'bar',
+  data: {
+    labels: clientLabels,
+    datasets: [
+      { label: 'Budget client', data: clientBudget, backgroundColor: 'rgba(123,28,46,0.3)', borderColor: '#7B1C2E', borderWidth: 2 },
+      { label: 'CA Réalisé', data: clientPreste, backgroundColor: 'rgba(21,101,192,0.4)', borderColor: '#1565c0', borderWidth: 2 }
+    ]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
+});
+</script>
+{% endblock %}
