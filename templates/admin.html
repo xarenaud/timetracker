@@ -141,8 +141,6 @@
       </table>
     </div>
 
-
-
     <!-- Manual Entry -->
     <div class="card card-full">
       <h3 class="card-title">✏️ Encodage manuel</h3>
@@ -228,7 +226,7 @@ function loadAdminSessions() {
           '<td>' +
             '<form method="POST" action="/admin/clear_sessions" style="display:inline">' +
               '<input type="hidden" name="user_id" value="' + u.user_id + '"/>' +
-              '<button type="submit" class="btn btn-xs btn-danger" onclick="return confirm('Terminer la session de ' + u.username + ' ?')">🗑 Terminer</button>' +
+              '<button type="submit" class="btn btn-xs btn-danger" onclick="return confirm(\'Terminer la session de ' + u.username + ' ?\')">🗑 Terminer</button>' +
             '</form>' +
           '</td>' +
           '</tr>';
@@ -265,7 +263,7 @@ function toggleClientServices(clientId) {
   }
 }
 
-// Charger les services d'un client existant
+// Charger les services d'un client existant — VERSION CORRIGEE avec createElement
 function loadClientServicesInline(clientId) {
   const container = document.getElementById('cs-list-' + clientId);
   fetch('/admin/get_client_assignments/' + clientId)
@@ -273,18 +271,39 @@ function loadClientServicesInline(clientId) {
     .then(data => {
       container.innerHTML = '';
       data.forEach(s => {
-        const checked = s.assigned ? 'checked' : '';
-        const hours = s.monthly_hours > 0 ? s.monthly_hours : '';
-        container.innerHTML +=
-          '<div class="service-check-row">' +
-            '<label class="chip-check">' +
-              '<input type="checkbox" name="selected_' + s.template_id + '" value="1" ' + checked + '/>' +
-              ' ' + s.name +
-            '</label>' +
-            '<input type="number" name="hours_' + s.template_id + '" value="' + hours + '"' +
-              ' step="0.5" min="0" placeholder="h/mois"' +
-              ' class="form-input form-input-xs"/>' +
-          '</div>';
+
+        // Div wrapper
+        const row = document.createElement('div');
+        row.className = 'service-check-row';
+
+        // Label + checkbox
+        const label = document.createElement('label');
+        label.className = 'chip-check';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.name = 'selected_' + s.template_id;
+        checkbox.value = '1';
+        checkbox.checked = s.assigned ? true : false;
+
+        const labelText = document.createTextNode(' ' + s.name);
+        label.appendChild(checkbox);
+        label.appendChild(labelText);
+
+        // Input heures
+        const hoursInput = document.createElement('input');
+        hoursInput.type = 'number';
+        hoursInput.name = 'hours_' + s.template_id;
+        hoursInput.value = s.monthly_hours > 0 ? s.monthly_hours : '';
+        hoursInput.step = '0.5';
+        hoursInput.min = '0';
+        hoursInput.placeholder = 'h/mois';
+        hoursInput.className = 'form-input form-input-xs';
+
+        // Assemblage
+        row.appendChild(label);
+        row.appendChild(hoursInput);
+        container.appendChild(row);
       });
     });
 }
