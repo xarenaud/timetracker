@@ -8,10 +8,7 @@ app.secret_key = 'cxmedia-secret-2024'
 # ── JOURS FÉRIÉS BELGES ───────────────────────────────────────────────────────
 
 def get_belgian_holidays(year):
-    """Retourne la liste des jours fériés belges pour une année donnée."""
     from datetime import date, timedelta
-
-    # Calcul de Pâques (algorithme de Meeus/Jones/Butcher)
     a = year % 19
     b = year // 100
     c = year % 100
@@ -27,44 +24,40 @@ def get_belgian_holidays(year):
     month = (h + l - 7 * m + 114) // 31
     day = ((h + l - 7 * m + 114) % 31) + 1
     easter = date(year, month, day)
-
     holidays = [
-        date(year, 1, 1),   # Nouvel An
-        easter + timedelta(days=1),   # Lundi de Pâques
-        date(year, 5, 1),   # Fête du Travail
-        easter + timedelta(days=39),  # Ascension
-        easter + timedelta(days=50),  # Lundi de Pentecôte
-        date(year, 7, 21),  # Fête Nationale
-        date(year, 8, 15),  # Assomption
-        date(year, 11, 1),  # Toussaint
-        date(year, 11, 11), # Armistice
-        date(year, 12, 25), # Noël
+        date(year, 1, 1),
+        easter + timedelta(days=1),
+        date(year, 5, 1),
+        easter + timedelta(days=39),
+        easter + timedelta(days=50),
+        date(year, 7, 21),
+        date(year, 8, 15),
+        date(year, 11, 1),
+        date(year, 11, 11),
+        date(year, 12, 25),
     ]
     return holidays
 
 def get_working_days(year, month):
-    """Retourne le nombre de jours ouvrables belges dans un mois donné."""
     from datetime import date
     import calendar
-
     holidays = get_belgian_holidays(year)
     _, num_days = calendar.monthrange(year, month)
     working_days = 0
     for day in range(1, num_days + 1):
         d = date(year, month, day)
-        if d.weekday() < 5 and d not in holidays:  # Lun-Ven et pas férié
+        if d.weekday() < 5 and d not in holidays:
             working_days += 1
     return working_days
 
 def get_vendable_hours_for_month(weekly_hours, year, month):
-    """Calcule les heures vendables pour un mois donné selon les jours ouvrables belges."""
     working_days = get_working_days(year, month)
-    working_weeks = working_days / 5  # Convertir en semaines
+    working_weeks = working_days / 5
     return round(weekly_hours * working_weeks, 2)
 
 @app.before_request
 def log_db_mode():
-    pass  # DB mode logged at startup
+    pass
 
 # ── DATABASE ──────────────────────────────────────────────────────────────────
 
@@ -72,13 +65,10 @@ DATABASE_URL = os.environ.get('DATABASE_URL', '')
 print(f"[STARTUP] DATABASE_URL={'SET ('+DATABASE_URL[:30]+'...)' if DATABASE_URL else 'NOT SET - using SQLite'}")
 
 if DATABASE_URL:
-    # PostgreSQL sur Railway
     import psycopg2
     import psycopg2.extras
     if DATABASE_URL.startswith('postgres://'):
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-
-    # Ajouter SSL si pas déjà présent
     if '?sslmode=' not in DATABASE_URL and 'sslmode=' not in DATABASE_URL:
         DATABASE_URL = DATABASE_URL + '?sslmode=require'
 
@@ -95,7 +85,6 @@ if DATABASE_URL:
     PLACEHOLDER = '%s'
     USE_PG = True
 else:
-    # SQLite en local
     import sqlite3
     DATABASE = 'timetracker.db'
 
@@ -108,7 +97,6 @@ else:
     USE_PG = False
 
 def P(n=1):
-    """Retourne n placeholders selon le moteur DB"""
     return ', '.join([PLACEHOLDER] * n)
 
 def init_db():
@@ -126,7 +114,9 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS clients (
             id SERIAL PRIMARY KEY,
             name TEXT UNIQUE NOT NULL,
-            active INTEGER DEFAULT 1
+            active INTEGER DEFAULT 1,
+            collab_start TEXT DEFAULT NULL,
+            collab_end TEXT DEFAULT NULL
         )''')
         c.execute('''CREATE TABLE IF NOT EXISTS service_templates (
             id SERIAL PRIMARY KEY,
@@ -186,7 +176,9 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS clients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL,
-            active INTEGER DEFAULT 1
+            active INTEGER DEFAULT 1,
+            collab_start TEXT DEFAULT NULL,
+            collab_end TEXT DEFAULT NULL
         )''')
         c.execute('''CREATE TABLE IF NOT EXISTS service_templates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -246,6 +238,27 @@ def init_db():
         pass
 
     conn.commit()
+    conn.close()
+
+def migrate_db():
+    """Ajoute les colonnes manquantes si la DB existe déjà (migration non destructive)."""
+    conn = get_db()
+    c = conn.cursor()
+    try:
+        if USE_PG:
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS collab_start TEXT DEFAULT NULL")
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS collab_end TEXT DEFAULT NULL")
+        else:
+            try:
+                c.execute("ALTER TABLE clients ADD COLUMN collab_start TEXT DEFAULT NULL")
+            except: pass
+            try:
+                c.execute("ALTER TABLE clients ADD COLUMN collab_end TEXT DEFAULT NULL")
+            except: pass
+        conn.commit()
+        print("[MIGRATE] Colonnes collab_start / collab_end OK")
+    except Exception as e:
+        print(f"[MIGRATE] {e}")
     conn.close()
 
 def hash_pw(pw):
@@ -390,7 +403,6 @@ def start_timer():
     conn = get_db()
     c = conn.cursor()
 
-    # Vérification anti-doublon : bloquer si déjà en session (peu importe le client)
     all_users = [session['user_id']] + colleagues
     conflicts = []
     for uid in all_users:
@@ -414,7 +426,6 @@ def start_timer():
         return jsonify({'error': ' | '.join(conflicts)}), 409
 
     session_id = str(uuid.uuid4())
-    # Utiliser l'heure envoyée par le navigateur (heure locale)
     now = data.get('started_at', datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'))
     if 'Z' in now or '.' in now:
         now = now.replace('Z','').split('.')[0]
@@ -426,7 +437,6 @@ def start_timer():
     for uid in colleagues:
         c.execute(f"INSERT INTO session_colleagues (session_id, user_id) VALUES ({P(2)})", (session_id, uid))
 
-    # Enregistrer sessions actives pour tous les participants
     for uid in all_users:
         c.execute(f"INSERT INTO active_sessions (user_id, session_id, client_id, started_at) VALUES ({P(4)})",
                   (uid, session_id, client_id, now))
@@ -455,14 +465,14 @@ def stop_timer():
         return ts
 
     start_time = clean_iso(start_time_raw)
-    end_time = clean_iso(end_time_raw) if end_time_raw else clean_iso(start_time_raw)  # fallback = start si pas reçu
+    end_time = clean_iso(end_time_raw) if end_time_raw else clean_iso(start_time_raw)
 
     start_dt = datetime.fromisoformat(start_time)
     end_dt = datetime.fromisoformat(end_time)
     total_seconds = (end_dt - start_dt).total_seconds()
     pause_seconds = pause_minutes * 60
     net_seconds = max(0, total_seconds - pause_seconds)
-    net_minutes = math.ceil(net_seconds / 60)  # Arrondi à la minute supérieure
+    net_minutes = math.ceil(net_seconds / 60)
 
     conn = get_db()
     c = conn.cursor()
@@ -478,7 +488,6 @@ def stop_timer():
             VALUES ({P(10)})
         """, (uid, client_id, template_id, start_time, end_time, net_minutes, pause_minutes, 0, justification, session_id))
 
-    # Supprimer les sessions actives pour ces users
     for uid in user_ids:
         c.execute(f"DELETE FROM active_sessions WHERE user_id={PLACEHOLDER}", (uid,))
 
@@ -570,7 +579,6 @@ def records():
         else:
             entries.append(dict(r))
 
-    # Stats
     stats = {}
     for e in entries:
         key = (e['client_name'], e['service_name'], e['client_id'], e['template_id'])
@@ -600,7 +608,7 @@ def admin():
     c = conn.cursor()
     c.execute("SELECT id, username, role, active FROM users ORDER BY username")
     users_raw = c.fetchall()
-    c.execute("SELECT id, name, active FROM clients ORDER BY name")
+    c.execute("SELECT id, name, active, collab_start, collab_end FROM clients ORDER BY name")
     clients_raw = c.fetchall()
     c.execute("SELECT id, name, active FROM service_templates ORDER BY name")
     templates_raw = c.fetchall()
@@ -616,7 +624,7 @@ def admin():
 
     if USE_PG:
         users = [{'id': r[0], 'username': r[1], 'role': r[2], 'active': r[3]} for r in users_raw]
-        clients = [{'id': r[0], 'name': r[1], 'active': r[2]} for r in clients_raw]
+        clients = [{'id': r[0], 'name': r[1], 'active': r[2], 'collab_start': r[3], 'collab_end': r[4]} for r in clients_raw]
         templates = [{'id': r[0], 'name': r[1], 'active': r[2]} for r in templates_raw]
         client_services = [{'id': r[0], 'monthly_hours': r[1], 'client_name': r[2], 'service_name': r[3]} for r in cs_raw]
     else:
@@ -670,17 +678,20 @@ def delete_user(uid):
 @admin_required
 def add_client():
     name = request.form['client_name']
+    collab_start = request.form.get('collab_start') or None
+    collab_end = request.form.get('collab_end') or None
     conn = get_db()
     c = conn.cursor()
     try:
         if USE_PG:
-            c.execute(f"INSERT INTO clients (name) VALUES ({PLACEHOLDER}) RETURNING id", (name,))
+            c.execute(f"INSERT INTO clients (name, collab_start, collab_end) VALUES ({P(3)}) RETURNING id",
+                      (name, collab_start, collab_end))
             client_id = c.fetchone()[0]
         else:
-            c.execute(f"INSERT INTO clients (name) VALUES ({PLACEHOLDER})", (name,))
+            c.execute(f"INSERT INTO clients (name, collab_start, collab_end) VALUES ({P(3)})",
+                      (name, collab_start, collab_end))
             client_id = c.lastrowid
 
-        # Assigner les services cochés
         c.execute("SELECT id FROM service_templates WHERE active=1")
         all_templates = c.fetchall()
         for t in all_templates:
@@ -714,6 +725,19 @@ def delete_client(cid):
     conn = get_db()
     c = conn.cursor()
     c.execute(f"DELETE FROM clients WHERE id={PLACEHOLDER}", (cid,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('admin'))
+
+@app.route('/admin/edit_client_dates/<int:cid>', methods=['POST'])
+@admin_required
+def edit_client_dates(cid):
+    collab_start = request.form.get('collab_start') or None
+    collab_end = request.form.get('collab_end') or None
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(f"UPDATE clients SET collab_start={PLACEHOLDER}, collab_end={PLACEHOLDER} WHERE id={PLACEHOLDER}",
+              (collab_start, collab_end, cid))
     conn.commit()
     conn.close()
     return redirect(url_for('admin'))
@@ -775,10 +799,8 @@ def assign_service():
 def get_client_assignments(client_id):
     conn = get_db()
     c = conn.cursor()
-    # Tous les templates actifs
     c.execute(f"SELECT id, name FROM service_templates WHERE active=1 ORDER BY name")
     all_templates = c.fetchall()
-    # Déjà affectés à ce client
     c.execute(f"SELECT template_id, monthly_hours FROM client_services WHERE client_id={PLACEHOLDER}", (client_id,))
     assigned_raw = c.fetchall()
     conn.close()
@@ -814,7 +836,6 @@ def assign_services_bulk():
     conn = get_db()
     c = conn.cursor()
 
-    # Récupérer tous les templates actifs
     c.execute("SELECT id FROM service_templates WHERE active=1")
     all_templates = c.fetchall()
     template_ids = [r[0] if USE_PG else r['id'] for r in all_templates]
@@ -827,23 +848,19 @@ def assign_services_bulk():
         except:
             hours = 0
 
-        # Vérifier si déjà affecté
         c.execute(f"SELECT id FROM client_services WHERE client_id={PLACEHOLDER} AND template_id={PLACEHOLDER}",
                   (client_id, tid))
         existing = c.fetchone()
 
         if is_selected:
             if existing:
-                # Mettre à jour les heures
                 c.execute(f"UPDATE client_services SET monthly_hours={PLACEHOLDER} WHERE client_id={PLACEHOLDER} AND template_id={PLACEHOLDER}",
                           (hours, client_id, tid))
             else:
-                # Créer l'affectation
                 c.execute(f"INSERT INTO client_services (client_id, template_id, monthly_hours) VALUES ({P(3)})",
                           (client_id, tid, hours))
         else:
             if existing:
-                # Supprimer l'affectation
                 c.execute(f"DELETE FROM client_services WHERE client_id={PLACEHOLDER} AND template_id={PLACEHOLDER}",
                           (client_id, tid))
 
@@ -949,8 +966,6 @@ def get_services_for_client(client_id):
         return jsonify([{'template_id': r[0], 'name': r[1]} for r in rows])
     return jsonify([dict(r) for r in rows])
 
-# ── CONFIG supprimée — heures gérées côté navigateur ──
-
 @app.route('/admin/clear_sessions', methods=['POST'])
 @admin_required
 def clear_sessions():
@@ -988,7 +1003,6 @@ def my_active_session():
     else:
         session_id, client_id, started_at, client_name = row['session_id'], row['client_id'], row['started_at'], row['client_name']
 
-    # Récupérer les services de cette session
     c.execute(f"""
         SELECT cs.id as cs_id, st.name as service_name, cs.template_id
         FROM client_services cs
@@ -1049,8 +1063,14 @@ def dashboard():
     c = conn.cursor()
 
     # Paramètres filtre
-    month = request.args.get('month', datetime.now().strftime('%Y-%m'))
+    month = request.args.get('month', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
     user_filter = request.args.get('user_id', '')
+
+    # Si aucun filtre → mois courant par défaut
+    if not month and not date_from and not date_to:
+        month = datetime.now().strftime('%Y-%m')
 
     # Users actifs
     c.execute("SELECT id, username FROM users WHERE active=1 ORDER BY username")
@@ -1070,11 +1090,17 @@ def dashboard():
     TARIF = 75.0
 
     # Calculer les heures vendables du mois sélectionné
-    year_int, month_int = int(month.split('-')[0]), int(month.split('-')[1])
+    if month:
+        year_int, month_int = int(month.split('-')[0]), int(month.split('-')[1])
+    else:
+        # Si filtre par période, on prend le mois de date_from ou mois courant
+        ref_date = date_from or datetime.now().strftime('%Y-%m-%d')
+        year_int, month_int = int(ref_date[:4]), int(ref_date[5:7])
+
     working_days = get_working_days(year_int, month_int)
     working_weeks = round(working_days / 5, 2)
 
-    # Heures prestées par user ce mois
+    # Heures prestées par user sur la période
     query_sql = f"""
         SELECT te.user_id, u.username,
                SUM(te.duration_minutes) as total_minutes,
@@ -1084,9 +1110,31 @@ def dashboard():
         JOIN users u ON te.user_id = u.id
         JOIN clients c ON te.client_id = c.id
         JOIN service_templates st ON te.template_id = st.id
-        WHERE {'TO_CHAR(CAST(te.start_time AS TIMESTAMP),' + PLACEHOLDER + ')' if USE_PG else "strftime('%Y-%m', te.start_time)"} = {PLACEHOLDER}
+        WHERE 1=1
     """
-    params = ['YYYY-MM', month] if USE_PG else [month]
+    params = []
+
+    if date_from or date_to:
+        # Filtre par période
+        if date_from:
+            if USE_PG:
+                query_sql += f" AND CAST(te.start_time AS DATE) >= {PLACEHOLDER}"
+            else:
+                query_sql += f" AND DATE(te.start_time) >= {PLACEHOLDER}"
+            params.append(date_from)
+        if date_to:
+            if USE_PG:
+                query_sql += f" AND CAST(te.start_time AS DATE) <= {PLACEHOLDER}"
+            else:
+                query_sql += f" AND DATE(te.start_time) <= {PLACEHOLDER}"
+            params.append(date_to)
+    else:
+        # Filtre par mois
+        if USE_PG:
+            query_sql += f" AND TO_CHAR(CAST(te.start_time AS TIMESTAMP), 'YYYY-MM') = {PLACEHOLDER}"
+        else:
+            query_sql += f" AND strftime('%Y-%m', te.start_time) = {PLACEHOLDER}"
+        params.append(month)
 
     if user_filter:
         query_sql += f" AND te.user_id = {PLACEHOLDER}"
@@ -1112,9 +1160,6 @@ def dashboard():
         s = settings.get(uid, {'hourly_cost': 0, 'vendable_hours': 0})
         hourly_cost = s['hourly_cost']
         vendable_h = s['vendable_hours']
-
-        # Stats collaborateur
-        # Heures vendables du mois = heures/semaine × semaines ouvrables
         vendable_h_month = round(vendable_h * working_weeks, 2)
 
         if uid not in collab_stats:
@@ -1135,14 +1180,13 @@ def dashboard():
         collab_stats[uid]['ca_realise'] += total_h * TARIF
         collab_stats[uid]['cout_total'] += total_h * hourly_cost
 
-    # Calculer marge finale par collab
     for uid in collab_stats:
         cs = collab_stats[uid]
         cs['marge'] = cs['ca_realise'] - cs['cout_total']
         cs['taux_realisation'] = round((cs['total_hours'] / cs['vendable_hours'] * 100), 1) if cs['vendable_hours'] > 0 else 0
 
-    # Stats par client (budget vs presté)
-    c.execute(f"""
+    # Stats par client
+    client_query_sql = f"""
         SELECT cs.client_id, cl.name, cs.template_id, st.name as sname, cs.monthly_hours,
                COALESCE(SUM(te.duration_minutes), 0) as total_min
         FROM client_services cs
@@ -1150,10 +1194,34 @@ def dashboard():
         JOIN service_templates st ON cs.template_id = st.id
         LEFT JOIN time_entries te ON te.client_id = cs.client_id
             AND te.template_id = cs.template_id
-            AND {'TO_CHAR(CAST(te.start_time AS TIMESTAMP),' + PLACEHOLDER + ')' if USE_PG else "strftime('%Y-%m', te.start_time)"} = {PLACEHOLDER}
-        GROUP BY cs.client_id, cl.name, cs.template_id, st.name, cs.monthly_hours
-        ORDER BY cl.name
-    """, (['YYYY-MM', month] if USE_PG else [month]))
+    """
+    client_params = []
+
+    if date_from or date_to:
+        conditions = []
+        if date_from:
+            if USE_PG:
+                conditions.append(f"CAST(te.start_time AS DATE) >= {PLACEHOLDER}")
+            else:
+                conditions.append(f"DATE(te.start_time) >= {PLACEHOLDER}")
+            client_params.append(date_from)
+        if date_to:
+            if USE_PG:
+                conditions.append(f"CAST(te.start_time AS DATE) <= {PLACEHOLDER}")
+            else:
+                conditions.append(f"DATE(te.start_time) <= {PLACEHOLDER}")
+            client_params.append(date_to)
+        if conditions:
+            client_query_sql += " AND (" + " AND ".join(conditions) + ")"
+    else:
+        if USE_PG:
+            client_query_sql += f" AND TO_CHAR(CAST(te.start_time AS TIMESTAMP), 'YYYY-MM') = {PLACEHOLDER}"
+        else:
+            client_query_sql += f" AND strftime('%Y-%m', te.start_time) = {PLACEHOLDER}"
+        client_params.append(month)
+
+    client_query_sql += " GROUP BY cs.client_id, cl.name, cs.template_id, st.name, cs.monthly_hours ORDER BY cl.name"
+    c.execute(client_query_sql, client_params)
 
     client_rows = c.fetchall()
     client_stats = {}
@@ -1199,6 +1267,7 @@ def dashboard():
         collab_stats=collab_stats,
         client_stats=client_stats,
         month=month, user_filter=user_filter,
+        date_from=date_from, date_to=date_to,
         TARIF=TARIF,
         working_days=working_days,
         working_weeks=working_weeks)
@@ -1211,7 +1280,7 @@ def save_collab_settings():
     users_ids = request.form.getlist('user_ids')
     for uid in users_ids:
         cost = float(request.form.get(f'cost_{uid}', 0) or 0)
-        hours = float(request.form.get(f'hours_{uid}', 0) or 0)  # heures/semaine
+        hours = float(request.form.get(f'hours_{uid}', 0) or 0)
         if USE_PG:
             c.execute(f"""INSERT INTO collaborator_settings (user_id, hourly_cost, vendable_hours)
                 VALUES ({P(3)})
@@ -1231,6 +1300,7 @@ register_export_routes(app, get_db, USE_PG, PLACEHOLDER, P, get_working_days)
 
 if __name__ == '__main__':
     init_db()
+    migrate_db()
     print("✅ CX-Media TimeTracker v4 — http://127.0.0.1:8080")
     print("   Login: admin / admin123")
     print(f"   DB Mode: {'PostgreSQL' if USE_PG else 'SQLite'}")

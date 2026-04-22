@@ -61,6 +61,17 @@
             <label class="field-label">Nom du client</label>
             <input type="text" name="client_name" placeholder="Nom du client" required class="form-input"/>
           </div>
+          <!-- Dates de collaboration -->
+          <div class="form-row mb-3">
+            <div class="form-group">
+              <label class="field-label">📅 Début collaboration</label>
+              <input type="date" name="collab_start" class="form-input"/>
+            </div>
+            <div class="form-group">
+              <label class="field-label">📅 Fin collaboration</label>
+              <input type="date" name="collab_end" class="form-input"/>
+            </div>
+          </div>
           {% if templates %}
           <div class="form-group mb-3">
             <label class="field-label">Services assignés (optionnel)</label>
@@ -85,7 +96,7 @@
 
       <!-- Liste clients -->
       <table class="table mt-2">
-        <thead><tr><th>Nom</th><th>Statut</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Nom</th><th>Période</th><th>Statut</th><th>Actions</th></tr></thead>
         <tbody>
           {% for c in clients %}
           <tr>
@@ -94,15 +105,36 @@
                 {{ c.name }} <small style="color:#999">▾</small>
               </span>
             </td>
+            <td>
+              <small style="color:#666">
+                {% if c.collab_start %}{{ c.collab_start }}{% else %}<span style="color:#ccc">—</span>{% endif %}
+                →
+                {% if c.collab_end %}{{ c.collab_end }}{% else %}<span style="color:#ccc">en cours</span>{% endif %}
+              </small>
+            </td>
             <td><span class="badge {% if c.active %}badge-success{% else %}badge-warning{% endif %}">{{ 'Actif' if c.active else 'Inactif' }}</span></td>
             <td>
               <a href="{{ url_for('toggle_client', cid=c.id) }}" class="btn btn-xs btn-secondary">{{ '🔒' if c.active else '🔓' }}</a>
+              <button type="button" class="btn btn-xs btn-secondary" onclick="toggleEditDates({{ c.id }})">📅</button>
               <a href="{{ url_for('delete_client', cid=c.id) }}" class="btn btn-xs btn-danger" onclick="return confirm('Supprimer {{ c.name }} ?')">🗑</a>
+            </td>
+          </tr>
+          <!-- Édition dates inline -->
+          <tr class="hidden" id="dates-row-{{ c.id }}">
+            <td colspan="4">
+              <form method="POST" action="{{ url_for('edit_client_dates', cid=c.id) }}" class="inline-form" style="gap:12px;flex-wrap:wrap">
+                <label style="font-size:13px;color:#666">📅 Début :</label>
+                <input type="date" name="collab_start" value="{{ c.collab_start or '' }}" class="form-input form-input-sm"/>
+                <label style="font-size:13px;color:#666">Fin :</label>
+                <input type="date" name="collab_end" value="{{ c.collab_end or '' }}" class="form-input form-input-sm"/>
+                <button type="submit" class="btn btn-xs btn-success">💾 Sauvegarder</button>
+                <button type="button" class="btn btn-xs btn-secondary" onclick="toggleEditDates({{ c.id }})">✖</button>
+              </form>
             </td>
           </tr>
           <!-- Services inline pour ce client -->
           <tr class="client-services-row hidden" id="cs-row-{{ c.id }}">
-            <td colspan="3">
+            <td colspan="4">
               <form method="POST" action="{{ url_for('assign_services_bulk') }}" class="services-inline-form">
                 <input type="hidden" name="client_id" value="{{ c.id }}"/>
                 <div class="services-checklist" id="cs-list-{{ c.id }}">
@@ -261,6 +293,12 @@ function toggleClientServices(clientId) {
   } else {
     row.classList.add('hidden');
   }
+}
+
+// Client existant - afficher/masquer édition dates
+function toggleEditDates(clientId) {
+  const row = document.getElementById('dates-row-' + clientId);
+  row.classList.toggle('hidden');
 }
 
 // Charger les services d'un client existant — VERSION CORRIGEE avec createElement

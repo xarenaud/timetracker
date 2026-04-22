@@ -16,7 +16,18 @@
       <div class="filter-row">
         <div class="filter-group">
           <label>Mois</label>
-          <input type="month" name="month" value="{{ month }}" class="form-input"/>
+          <input type="month" name="month" value="{{ month }}" class="form-input"
+            id="filter-month" onchange="syncPeriodFromMonth()"/>
+        </div>
+        <div class="filter-group">
+          <label>— ou — Période du</label>
+          <input type="date" name="date_from" value="{{ date_from }}" class="form-input"
+            id="filter-date-from" onchange="clearMonth()"/>
+        </div>
+        <div class="filter-group">
+          <label>au</label>
+          <input type="date" name="date_to" value="{{ date_to }}" class="form-input"
+            id="filter-date-to" onchange="clearMonth()"/>
         </div>
         <div class="filter-group">
           <label>Collaborateur</label>
@@ -35,11 +46,15 @@
     </form>
   </div>
 
-  <!-- Info mois -->
+  <!-- Info période -->
   <div class="month-info-bar">
-    📅 <strong>{{ month }}</strong> — 
-    <strong>{{ working_days }}</strong> jours ouvrables belges — 
-    <strong>{{ working_weeks }}</strong> semaines effectives
+    {% if date_from or date_to %}
+      📅 Période : <strong>{{ date_from or '...' }}</strong> → <strong>{{ date_to or '...' }}</strong>
+    {% else %}
+      📅 <strong>{{ month }}</strong> —
+      <strong>{{ working_days }}</strong> jours ouvrables belges —
+      <strong>{{ working_weeks }}</strong> semaines effectives
+    {% endif %}
   </div>
 
   <!-- KPIs globaux -->
@@ -73,24 +88,19 @@
 
   <!-- Graphiques -->
   <div class="charts-grid">
-
-    <!-- Graphique CA Attendu vs Réalisé par collaborateur -->
     <div class="card">
       <h3 class="card-title">📈 CA Attendu vs Réalisé par collaborateur</h3>
       <canvas id="chartCollab" height="200"></canvas>
     </div>
-
-    <!-- Graphique Rentabilité clients -->
     <div class="card">
       <h3 class="card-title">🏢 Budget vs Heures prestées par client</h3>
       <canvas id="chartClients" height="200"></canvas>
     </div>
-
   </div>
 
   <!-- Stats collaborateurs -->
   <div class="card">
-    <h3 class="card-title">👥 Performance collaborateurs — {{ month }}</h3>
+    <h3 class="card-title">👥 Performance collaborateurs — {% if date_from or date_to %}{{ date_from or '...' }} → {{ date_to or '...' }}{% else %}{{ month }}{% endif %}</h3>
     {% if collab_stats %}
     <div class="table-scroll">
     <table class="table">
@@ -113,10 +123,10 @@
         <tr>
           <td><strong>{{ cs.username }}</strong></td>
           <td>
-              <span title="{{ cs.vendable_hours_week }}h/sem × {{ cs.working_weeks }} sem">
-                {{ cs.vendable_hours_week }}h/sem → <strong>{{ cs.vendable_hours }}h</strong>
-              </span>
-            </td>
+            <span title="{{ cs.vendable_hours_week }}h/sem × {{ cs.working_weeks }} sem">
+              {{ cs.vendable_hours_week }}h/sem → <strong>{{ cs.vendable_hours }}h</strong>
+            </span>
+          </td>
           <td>{{ "%.1f"|format(cs.total_hours) }}h</td>
           <td>
             <div class="progress-bar-wrap">
@@ -144,13 +154,13 @@
     </table>
     </div>
     {% else %}
-      <p class="empty-msg">Aucune donnée pour ce mois.</p>
+      <p class="empty-msg">Aucune donnée pour cette période.</p>
     {% endif %}
   </div>
 
   <!-- Stats clients -->
   <div class="card">
-    <h3 class="card-title">🏢 Rentabilité clients — {{ month }}</h3>
+    <h3 class="card-title">🏢 Rentabilité clients — {% if date_from or date_to %}{{ date_from or '...' }} → {{ date_to or '...' }}{% else %}{{ month }}{% endif %}</h3>
     {% if client_stats %}
     <div class="table-scroll">
     <table class="table">
@@ -188,7 +198,6 @@
             {% endif %}
           </td>
         </tr>
-        <!-- Détail services -->
         {% for svc in cs.services %}
         <tr class="service-detail-row">
           <td style="padding-left:24px;color:#999">↳ {{ svc.name }}</td>
@@ -208,7 +217,7 @@
     </table>
     </div>
     {% else %}
-      <p class="empty-msg">Aucune donnée pour ce mois.</p>
+      <p class="empty-msg">Aucune donnée pour cette période.</p>
     {% endif %}
   </div>
 
@@ -254,6 +263,19 @@
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
+// Sync filtre mois → dates
+function syncPeriodFromMonth() {
+  const m = document.getElementById('filter-month').value;
+  if (m) {
+    document.getElementById('filter-date-from').value = '';
+    document.getElementById('filter-date-to').value = '';
+  }
+}
+// Si on choisit une date → vider le mois
+function clearMonth() {
+  document.getElementById('filter-month').value = '';
+}
+
 // Données collaborateurs
 const collabLabels = [{% for uid, cs in collab_stats.items() %}"{{ cs.username }}",{% endfor %}];
 const collabAttendu = [{% for uid, cs in collab_stats.items() %}{{ "%.0f"|format(cs.ca_attendu) }},{% endfor %}];
