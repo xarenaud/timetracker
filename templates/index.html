@@ -288,7 +288,7 @@ function startTimer() {
   fetch('/start_timer', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ client_id: parseInt(clientId), service_id: parseInt(serviceId), colleagues })
+    body: JSON.stringify({ client_id: parseInt(clientId), service_id: parseInt(serviceId), colleagues, started_at: localISO(new Date()) })
   })
   .then(r => {
     if (r.status === 409) {

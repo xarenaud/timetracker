@@ -3,6 +3,20 @@
 <div class="admin-page">
   <h2 class="page-title">⚙️ Administration</h2>
 
+  <!-- Sessions actives -->
+  <div class="card" style="margin-bottom:16px;border-left:4px solid var(--warning)">
+    <h3 class="card-title">⚠️ Sessions actives — Gestion</h3>
+    <div id="admin-sessions-list">Chargement...</div>
+    <form method="POST" action="{{ url_for('clear_sessions') }}" style="margin-top:12px">
+      <input type="hidden" name="user_id" value=""/>
+      <button type="submit" class="btn btn-warning"
+        onclick="return confirm('Vider TOUTES les sessions actives ?')"
+        style="font-size:13px">
+        🧹 Vider toutes les sessions bloquées
+      </button>
+    </form>
+  </div>
+
   <div class="admin-grid">
 
     <!-- Users -->
@@ -194,6 +208,37 @@
 </div>
 
 <script>
+// Charger les sessions actives
+function loadAdminSessions() {
+  fetch('/active_users')
+    .then(r => r.json())
+    .then(data => {
+      const container = document.getElementById('admin-sessions-list');
+      if (data.length === 0) {
+        container.innerHTML = '<p class="empty-msg">✅ Aucune session active en ce moment.</p>';
+        return;
+      }
+      let html = '<table class="table"><thead><tr><th>Utilisateur</th><th>Client</th><th>Depuis</th><th>Action</th></tr></thead><tbody>';
+      data.forEach(u => {
+        const started = new Date(u.started_at);
+        html += '<tr>' +
+          '<td><strong>' + u.username + '</strong></td>' +
+          '<td>' + u.client_name + '</td>' +
+          '<td>' + started.toLocaleTimeString('fr-BE', {hour:'2-digit', minute:'2-digit'}) + ' (' + started.toLocaleDateString('fr-BE') + ')</td>' +
+          '<td>' +
+            '<form method="POST" action="/admin/clear_sessions" style="display:inline">' +
+              '<input type="hidden" name="user_id" value="' + u.user_id + '"/>' +
+              '<button type="submit" class="btn btn-xs btn-danger" onclick="return confirm('Terminer la session de ' + u.username + ' ?')">🗑 Terminer</button>' +
+            '</form>' +
+          '</td>' +
+          '</tr>';
+      });
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    });
+}
+document.addEventListener('DOMContentLoaded', loadAdminSessions);
+
 // Nouveau client - toggle form
 function toggleNewClient() {
   const box = document.getElementById('new-client-box');

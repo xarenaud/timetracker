@@ -414,7 +414,10 @@ def start_timer():
         return jsonify({'error': ' | '.join(conflicts)}), 409
 
     session_id = str(uuid.uuid4())
-    now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+    # Utiliser l'heure envoyée par le navigateur (heure locale)
+    now = data.get('started_at', datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'))
+    if 'Z' in now or '.' in now:
+        now = now.replace('Z','').split('.')[0]
 
     c.execute(f"SELECT template_id FROM client_services WHERE id={PLACEHOLDER}", (service_id,))
     row = c.fetchone()
@@ -947,6 +950,20 @@ def get_services_for_client(client_id):
     return jsonify([dict(r) for r in rows])
 
 # ── CONFIG supprimée — heures gérées côté navigateur ──
+
+@app.route('/admin/clear_sessions', methods=['POST'])
+@admin_required
+def clear_sessions():
+    user_id = request.form.get('user_id', '')
+    conn = get_db()
+    c = conn.cursor()
+    if user_id:
+        c.execute(f"DELETE FROM active_sessions WHERE user_id={PLACEHOLDER}", (user_id,))
+    else:
+        c.execute("DELETE FROM active_sessions")
+    conn.commit()
+    conn.close()
+    return redirect(url_for('admin'))
 
 @app.route('/my_active_session')
 @login_required
