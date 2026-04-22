@@ -908,13 +908,6 @@ def active_users():
         return jsonify([{'user_id': r[0], 'username': r[1], 'client_name': r[2]} for r in rows])
     return jsonify([{'user_id': r['user_id'], 'username': r['username'], 'client_name': r['client_name']} for r in rows])
 
-if __name__ == '__main__':
-    init_db()
-    print("✅ CX-Media TimeTracker v4 — http://127.0.0.1:8080")
-    print("   Login: admin / admin123")
-    print(f"   DB Mode: {'PostgreSQL' if USE_PG else 'SQLite'}")
-    print(f"   DATABASE_URL: {'SET' if DATABASE_URL else 'NOT SET'}")
-    app.run(debug=True, host='0.0.0.0', port=8080)
 
 # ── DASHBOARD ─────────────────────────────────────────────────────────────────
 
@@ -1086,3 +1079,11 @@ def save_collab_settings():
     conn.commit()
     conn.close()
     return redirect(url_for('dashboard'))
+
+if __name__ == '__main__':
+    init_db()
+    print("✅ CX-Media TimeTracker v4 — http://127.0.0.1:8080")
+    print("   Login: admin / admin123")
+    print(f"   DB Mode: {'PostgreSQL' if USE_PG else 'SQLite'}")
+    print(f"   DATABASE_URL: {'SET' if DATABASE_URL else 'NOT SET'}")
+    app.run(debug=True, host='0.0.0.0', port=8080)
