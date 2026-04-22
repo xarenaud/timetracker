@@ -2,7 +2,13 @@
 {% block content %}
 <div class="dashboard-page">
 
-  <h2 class="page-title">📊 Dashboard Rentabilité</h2>
+  <div class="dashboard-header">
+    <h2 class="page-title">📊 Dashboard Rentabilité</h2>
+    <div class="export-buttons">
+      <a href="{{ url_for('export_pdf', month=month) }}" class="btn btn-danger">📄 Export PDF</a>
+      <a href="{{ url_for('export_excel', month=month) }}" class="btn btn-success">📊 Export Excel</a>
+    </div>
+  </div>
 
   <!-- Filtres -->
   <div class="card">

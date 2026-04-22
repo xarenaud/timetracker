@@ -1151,6 +1151,10 @@ def save_collab_settings():
     month = request.form.get('month', datetime.now().strftime('%Y-%m'))
     return redirect(url_for('dashboard', month=month))
 
+# Enregistrer les routes d'export
+from export_routes import register_export_routes
+register_export_routes(app, get_db, USE_PG, PLACEHOLDER, P, get_working_days)
+
 if __name__ == '__main__':
     init_db()
     print("✅ CX-Media TimeTracker v4 — http://127.0.0.1:8080")
