@@ -5,6 +5,63 @@ import os, hashlib, math
 app = Flask(__name__)
 app.secret_key = 'cxmedia-secret-2024'
 
+# ── JOURS FÉRIÉS BELGES ───────────────────────────────────────────────────────
+
+def get_belgian_holidays(year):
+    """Retourne la liste des jours fériés belges pour une année donnée."""
+    from datetime import date, timedelta
+
+    # Calcul de Pâques (algorithme de Meeus/Jones/Butcher)
+    a = year % 19
+    b = year // 100
+    c = year % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = ((h + l - 7 * m + 114) % 31) + 1
+    easter = date(year, month, day)
+
+    holidays = [
+        date(year, 1, 1),   # Nouvel An
+        easter + timedelta(days=1),   # Lundi de Pâques
+        date(year, 5, 1),   # Fête du Travail
+        easter + timedelta(days=39),  # Ascension
+        easter + timedelta(days=50),  # Lundi de Pentecôte
+        date(year, 7, 21),  # Fête Nationale
+        date(year, 8, 15),  # Assomption
+        date(year, 11, 1),  # Toussaint
+        date(year, 11, 11), # Armistice
+        date(year, 12, 25), # Noël
+    ]
+    return holidays
+
+def get_working_days(year, month):
+    """Retourne le nombre de jours ouvrables belges dans un mois donné."""
+    from datetime import date
+    import calendar
+
+    holidays = get_belgian_holidays(year)
+    _, num_days = calendar.monthrange(year, month)
+    working_days = 0
+    for day in range(1, num_days + 1):
+        d = date(year, month, day)
+        if d.weekday() < 5 and d not in holidays:  # Lun-Ven et pas férié
+            working_days += 1
+    return working_days
+
+def get_vendable_hours_for_month(weekly_hours, year, month):
+    """Calcule les heures vendables pour un mois donné selon les jours ouvrables belges."""
+    working_days = get_working_days(year, month)
+    working_weeks = working_days / 5  # Convertir en semaines
+    return round(weekly_hours * working_weeks, 2)
+
 @app.before_request
 def log_db_mode():
     pass  # DB mode logged at startup
@@ -938,6 +995,11 @@ def dashboard():
 
     TARIF = 75.0
 
+    # Calculer les heures vendables du mois sélectionné
+    year_int, month_int = int(month.split('-')[0]), int(month.split('-')[1])
+    working_days = get_working_days(year_int, month_int)
+    working_weeks = round(working_days / 5, 2)
+
     # Heures prestées par user ce mois
     query_sql = f"""
         SELECT te.user_id, u.username,
@@ -978,14 +1040,20 @@ def dashboard():
         vendable_h = s['vendable_hours']
 
         # Stats collaborateur
+        # Heures vendables du mois = heures/semaine × semaines ouvrables
+        vendable_h_month = round(vendable_h * working_weeks, 2)
+
         if uid not in collab_stats:
             collab_stats[uid] = {
                 'username': uname,
                 'total_hours': 0,
-                'vendable_hours': vendable_h,
+                'vendable_hours_week': vendable_h,
+                'vendable_hours': vendable_h_month,
+                'working_weeks': working_weeks,
+                'working_days': working_days,
                 'hourly_cost': hourly_cost,
                 'ca_realise': 0,
-                'ca_attendu': vendable_h * TARIF,
+                'ca_attendu': vendable_h_month * TARIF,
                 'cout_total': 0,
                 'marge': 0
             }
@@ -1057,7 +1125,9 @@ def dashboard():
         collab_stats=collab_stats,
         client_stats=client_stats,
         month=month, user_filter=user_filter,
-        TARIF=TARIF)
+        TARIF=TARIF,
+        working_days=working_days,
+        working_weeks=working_weeks)
 
 @app.route('/dashboard/save_settings', methods=['POST'])
 @admin_required
@@ -1067,7 +1137,7 @@ def save_collab_settings():
     users_ids = request.form.getlist('user_ids')
     for uid in users_ids:
         cost = float(request.form.get(f'cost_{uid}', 0) or 0)
-        hours = float(request.form.get(f'hours_{uid}', 0) or 0)
+        hours = float(request.form.get(f'hours_{uid}', 0) or 0)  # heures/semaine
         if USE_PG:
             c.execute(f"""INSERT INTO collaborator_settings (user_id, hourly_cost, vendable_hours)
                 VALUES ({P(3)})
@@ -1078,7 +1148,8 @@ def save_collab_settings():
                 VALUES ({P(3)})""", (uid, cost, hours))
     conn.commit()
     conn.close()
-    return redirect(url_for('dashboard'))
+    month = request.form.get('month', datetime.now().strftime('%Y-%m'))
+    return redirect(url_for('dashboard', month=month))
 
 if __name__ == '__main__':
     init_db()

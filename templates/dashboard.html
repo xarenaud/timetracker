@@ -29,6 +29,13 @@
     </form>
   </div>
 
+  <!-- Info mois -->
+  <div class="month-info-bar">
+    📅 <strong>{{ month }}</strong> — 
+    <strong>{{ working_days }}</strong> jours ouvrables belges — 
+    <strong>{{ working_weeks }}</strong> semaines effectives
+  </div>
+
   <!-- KPIs globaux -->
   {% set total_ca_attendu = collab_stats.values() | sum(attribute='ca_attendu') %}
   {% set total_ca_realise = collab_stats.values() | sum(attribute='ca_realise') %}
@@ -84,7 +91,7 @@
       <thead>
         <tr>
           <th>Collaborateur</th>
-          <th>H. vendables/mois</th>
+          <th>H/sem → H/mois</th>
           <th>H. prestées</th>
           <th>Taux réalisation</th>
           <th>CA Attendu</th>
@@ -99,7 +106,11 @@
         {% set taux = cs.taux_realisation %}
         <tr>
           <td><strong>{{ cs.username }}</strong></td>
-          <td>{{ cs.vendable_hours }}h</td>
+          <td>
+              <span title="{{ cs.vendable_hours_week }}h/sem × {{ cs.working_weeks }} sem">
+                {{ cs.vendable_hours_week }}h/sem → <strong>{{ cs.vendable_hours }}h</strong>
+              </span>
+            </td>
           <td>{{ "%.1f"|format(cs.total_hours) }}h</td>
           <td>
             <div class="progress-bar-wrap">
@@ -205,7 +216,7 @@
           <tr>
             <th>Collaborateur</th>
             <th>Coût horaire (€/h)</th>
-            <th>Heures vendables/mois</th>
+            <th>Heures vendables/semaine</th>
           </tr>
         </thead>
         <tbody>
@@ -221,7 +232,8 @@
             <td>
               <input type="number" name="hours_{{ u.id }}"
                 value="{{ settings[u.id].vendable_hours if u.id in settings else '' }}"
-                step="0.5" min="0" placeholder="h/mois" class="form-input form-input-sm"/>
+                step="0.5" min="0" placeholder="h/semaine" class="form-input form-input-sm"/>
+              <small style="color:#999;font-size:11px">→ {{ "%.1f"|format(settings[u.id].vendable_hours * working_weeks) if u.id in settings and settings[u.id].vendable_hours > 0 else '—' }}h ce mois</small>
             </td>
           </tr>
           {% endfor %}

@@ -550,3 +550,16 @@ body {
 @media (max-width: 480px) {
   .kpi-grid { grid-template-columns: 1fr; }
 }
+
+/* ── MONTH INFO BAR ── */
+.month-info-bar {
+  background: white;
+  border-radius: var(--radius);
+  padding: 12px 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--gris-bord);
+  border-left: 4px solid var(--bordeaux);
+  font-size: 14px;
+  color: var(--text);
+}
