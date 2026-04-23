@@ -68,6 +68,7 @@
         <tr>
           <th>Client</th>
           <th>Prestation</th>
+          <th>Note</th>
           <th>Total</th>
           <th>Quota/mois</th>
           <th>%</th>
@@ -81,6 +82,13 @@
         <tr class="{% if quota > 0 and hours > quota %}row-over{% endif %}">
           <td>{{ key[0] }}</td>
           <td>{{ key[1] }}</td>
+          <td>
+            {% if s.note %}
+              <span style="color:#666;font-size:12px;font-style:italic">{{ s.note }}</span>
+            {% else %}
+              <span style="color:#ccc">—</span>
+            {% endif %}
+          </td>
           <td><strong>{{ "%.1f"|format(hours) }}h</strong></td>
           <td>{{ quota }}h</td>
           <td>
@@ -109,6 +117,7 @@
           {% if session.role == 'admin' %}<th>Collaborateur</th>{% endif %}
           <th>Client</th>
           <th>Prestation</th>
+          <th>Note</th>
           <th>Début</th>
           <th>Fin</th>
           <th>Durée</th>
@@ -126,6 +135,13 @@
           {% if session.role == 'admin' %}<td>{{ e.username }}</td>{% endif %}
           <td>{{ e.client_name }}</td>
           <td>{{ e.service_name }}</td>
+          <td>
+            {% if e.service_note %}
+              <span style="color:#666;font-size:12px;font-style:italic">{{ e.service_note }}</span>
+            {% else %}
+              <span style="color:#ddd">—</span>
+            {% endif %}
+          </td>
           <td>{{ e.start_time[11:16] }}</td>
           <td>{{ e.end_time[11:16] if e.end_time else '—' }}</td>
           <td><strong>{{ h }}h{{ '%02d'|format(m) }}</strong></td>
@@ -145,7 +161,7 @@
         </tr>
         {% if session.role == 'admin' %}
         <tr class="edit-row hidden" id="edit-row-{{ e.id }}">
-          <td colspan="10">
+          <td colspan="11">
             <form method="POST" action="{{ url_for('edit_entry', eid=e.id) }}" class="edit-form">
               <input type="date" name="date" value="{{ e.start_time[:10] }}" class="form-input form-input-sm"/>
               <input type="time" name="start_hour" value="{{ e.start_time[11:16] }}" class="form-input form-input-sm"/>

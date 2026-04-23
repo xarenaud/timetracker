@@ -128,6 +128,7 @@ def init_db():
             client_id INTEGER NOT NULL,
             template_id INTEGER NOT NULL,
             monthly_hours REAL DEFAULT 0,
+            note TEXT DEFAULT NULL,
             UNIQUE(client_id, template_id)
         )''')
         c.execute('''CREATE TABLE IF NOT EXISTS time_entries (
@@ -190,6 +191,7 @@ def init_db():
             client_id INTEGER NOT NULL,
             template_id INTEGER NOT NULL,
             monthly_hours REAL DEFAULT 0,
+            note TEXT DEFAULT NULL,
             UNIQUE(client_id, template_id)
         )''')
         c.execute('''CREATE TABLE IF NOT EXISTS time_entries (
@@ -248,6 +250,7 @@ def migrate_db():
         if USE_PG:
             c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS collab_start TEXT DEFAULT NULL")
             c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS collab_end TEXT DEFAULT NULL")
+            c.execute("ALTER TABLE client_services ADD COLUMN IF NOT EXISTS note TEXT DEFAULT NULL")
         else:
             try:
                 c.execute("ALTER TABLE clients ADD COLUMN collab_start TEXT DEFAULT NULL")
@@ -255,8 +258,11 @@ def migrate_db():
             try:
                 c.execute("ALTER TABLE clients ADD COLUMN collab_end TEXT DEFAULT NULL")
             except: pass
+            try:
+                c.execute("ALTER TABLE client_services ADD COLUMN note TEXT DEFAULT NULL")
+            except: pass
         conn.commit()
-        print("[MIGRATE] Colonnes collab_start / collab_end OK")
+        print("[MIGRATE] Colonnes collab_start / collab_end / note OK")
     except Exception as e:
         print(f"[MIGRATE] {e}")
     conn.close()
@@ -530,11 +536,13 @@ def records():
         SELECT te.id, te.start_time, te.end_time, te.duration_minutes, te.pause_minutes,
                te.is_manual, te.justification, te.session_id,
                u.username, c.name as client_name, st.name as service_name,
-               te.client_id, te.template_id, te.user_id
+               te.client_id, te.template_id, te.user_id,
+               cs.note as service_note
         FROM time_entries te
         JOIN users u ON te.user_id = u.id
         JOIN clients c ON te.client_id = c.id
         JOIN service_templates st ON te.template_id = st.id
+        LEFT JOIN client_services cs ON cs.client_id = te.client_id AND cs.template_id = te.template_id
         WHERE 1=1
     """
     params = []
@@ -574,7 +582,8 @@ def records():
                 'duration_minutes': r[3], 'pause_minutes': r[4],
                 'is_manual': r[5], 'justification': r[6], 'session_id': r[7],
                 'username': r[8], 'client_name': r[9], 'service_name': r[10],
-                'client_id': r[11], 'template_id': r[12], 'user_id': r[13]
+                'client_id': r[11], 'template_id': r[12], 'user_id': r[13],
+                'service_note': r[14] or ''
             })
         else:
             entries.append(dict(r))
@@ -583,14 +592,18 @@ def records():
     for e in entries:
         key = (e['client_name'], e['service_name'], e['client_id'], e['template_id'])
         if key not in stats:
-            stats[key] = {'total_minutes': 0, 'monthly_hours': 0}
+            stats[key] = {'total_minutes': 0, 'monthly_hours': 0, 'note': e.get('service_note', '')}
         stats[key]['total_minutes'] += e['duration_minutes']
 
     for key in stats:
-        c.execute(f"SELECT monthly_hours FROM client_services WHERE client_id={PLACEHOLDER} AND template_id={PLACEHOLDER}",
+        c.execute(f"SELECT monthly_hours, note FROM client_services WHERE client_id={PLACEHOLDER} AND template_id={PLACEHOLDER}",
                   (key[2], key[3]))
         row = c.fetchone()
-        stats[key]['monthly_hours'] = (row[0] if USE_PG else row['monthly_hours']) if row else 0
+        if row:
+            stats[key]['monthly_hours'] = row[0] if USE_PG else row['monthly_hours']
+            stats[key]['note'] = (row[1] if USE_PG else row['note']) or ''
+        else:
+            stats[key]['monthly_hours'] = 0
 
     conn.close()
     return render_template('records.html', entries=entries, stats=stats,
@@ -698,8 +711,9 @@ def add_client():
             tid = t[0] if USE_PG else t['id']
             if request.form.get(f'selected_{tid}'):
                 hours = float(request.form.get(f'hours_{tid}', 0) or 0)
-                c.execute(f"INSERT INTO client_services (client_id, template_id, monthly_hours) VALUES ({P(3)})",
-                          (client_id, tid, hours))
+                note = request.form.get(f'note_{tid}', '') or None
+                c.execute(f"INSERT INTO client_services (client_id, template_id, monthly_hours, note) VALUES ({P(4)})",
+                          (client_id, tid, hours, note))
         conn.commit()
     except Exception as e:
         print(f"Erreur add_client: {e}")
@@ -801,31 +815,35 @@ def get_client_assignments(client_id):
     c = conn.cursor()
     c.execute(f"SELECT id, name FROM service_templates WHERE active=1 ORDER BY name")
     all_templates = c.fetchall()
-    c.execute(f"SELECT template_id, monthly_hours FROM client_services WHERE client_id={PLACEHOLDER}", (client_id,))
+    c.execute(f"SELECT template_id, monthly_hours, note FROM client_services WHERE client_id={PLACEHOLDER}", (client_id,))
     assigned_raw = c.fetchall()
     conn.close()
 
     if USE_PG:
-        assigned = {r[0]: r[1] for r in assigned_raw}
+        assigned = {r[0]: {'monthly_hours': r[1], 'note': r[2]} for r in assigned_raw}
         result = []
         for t in all_templates:
             tid = t[0]
+            info = assigned.get(tid, {})
             result.append({
                 'template_id': tid,
                 'name': t[1],
                 'assigned': tid in assigned,
-                'monthly_hours': assigned.get(tid, 0)
+                'monthly_hours': info.get('monthly_hours', 0),
+                'note': info.get('note', '')
             })
     else:
-        assigned = {r['template_id']: r['monthly_hours'] for r in assigned_raw}
+        assigned = {r['template_id']: {'monthly_hours': r['monthly_hours'], 'note': r['note']} for r in assigned_raw}
         result = []
         for t in all_templates:
             tid = t['id']
+            info = assigned.get(tid, {})
             result.append({
                 'template_id': tid,
                 'name': t['name'],
                 'assigned': tid in assigned,
-                'monthly_hours': assigned.get(tid, 0)
+                'monthly_hours': info.get('monthly_hours', 0),
+                'note': info.get('note', '')
             })
     return jsonify(result)
 
@@ -852,13 +870,15 @@ def assign_services_bulk():
                   (client_id, tid))
         existing = c.fetchone()
 
+        note = request.form.get(f'note_{tid}', '') or None
+
         if is_selected:
             if existing:
-                c.execute(f"UPDATE client_services SET monthly_hours={PLACEHOLDER} WHERE client_id={PLACEHOLDER} AND template_id={PLACEHOLDER}",
-                          (hours, client_id, tid))
+                c.execute(f"UPDATE client_services SET monthly_hours={PLACEHOLDER}, note={PLACEHOLDER} WHERE client_id={PLACEHOLDER} AND template_id={PLACEHOLDER}",
+                          (hours, note, client_id, tid))
             else:
-                c.execute(f"INSERT INTO client_services (client_id, template_id, monthly_hours) VALUES ({P(3)})",
-                          (client_id, tid, hours))
+                c.execute(f"INSERT INTO client_services (client_id, template_id, monthly_hours, note) VALUES ({P(4)})",
+                          (client_id, tid, hours, note))
         else:
             if existing:
                 c.execute(f"DELETE FROM client_services WHERE client_id={PLACEHOLDER} AND template_id={PLACEHOLDER}",
@@ -955,7 +975,7 @@ def get_services_for_client(client_id):
     conn = get_db()
     c = conn.cursor()
     c.execute(f"""
-        SELECT cs.template_id, st.name
+        SELECT cs.template_id, st.name, cs.note
         FROM client_services cs
         JOIN service_templates st ON cs.template_id = st.id
         WHERE cs.client_id = {PLACEHOLDER} ORDER BY st.name
@@ -963,7 +983,7 @@ def get_services_for_client(client_id):
     rows = c.fetchall()
     conn.close()
     if USE_PG:
-        return jsonify([{'template_id': r[0], 'name': r[1]} for r in rows])
+        return jsonify([{'template_id': r[0], 'name': r[1], 'note': r[2] or ''} for r in rows])
     return jsonify([dict(r) for r in rows])
 
 @app.route('/admin/clear_sessions', methods=['POST'])
