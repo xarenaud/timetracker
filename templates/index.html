@@ -35,6 +35,12 @@
       </select>
     </div>
 
+    <!-- NOTE FACULTATIVE -->
+    <div class="form-group mb-3" id="note-group" style="display:none">
+      <label class="field-label">📝 Note <small style="color:#999;font-weight:normal">(optionnel — ex: Logo v2, Réunion client...)</small></label>
+      <input type="text" id="user-note" class="form-input" placeholder="Décrivez brièvement ce sur quoi vous travaillez..."/>
+    </div>
+
     <div class="form-group mb-3" id="colleagues-group" style="display:none">
       <label class="field-label">Collègues (optionnel)</label>
       <div class="chips" id="colleague-chips">
@@ -83,7 +89,6 @@
 </div>
 
 <script>
-// Formater une date en heure locale YYYY-MM-DDTHH:MM:SS
 function localISO(d) {
   return d.getFullYear() + '-' +
     String(d.getMonth()+1).padStart(2,'0') + '-' +
@@ -102,6 +107,7 @@ let serviceId = null;
 let pauseStart = null;
 let totalPauseMs = 0;
 let isPaused = false;
+let userNote = '';
 
 // ── REPRISE SESSION ACTIVE ──────────────────────────────────────────────────
 let resumeSessionId = null;
@@ -119,7 +125,6 @@ function checkActiveSession() {
         resumeClientId = data.client_id;
         resumeStartTime = new Date(data.started_at);
 
-        // Afficher le service (premier de la liste)
         const svc = data.services.length > 0 ? data.services[0] : null;
         if (svc) resumeTemplateId = svc.template_id;
 
@@ -150,7 +155,6 @@ function forceStop() {
   if (!confirm('Confirmes-tu la fin de cette session ?')) return;
   clearInterval(resumeInterval);
   const endTimestamp = new Date();
-  const pauseMinutes = 0;
 
   fetch('/stop_timer', {
     method: 'POST',
@@ -161,7 +165,7 @@ function forceStop() {
       template_id: resumeTemplateId,
       start_time: localISO(resumeStartTime),
       end_time: localISO(endTimestamp),
-      pause_minutes: pauseMinutes,
+      pause_minutes: 0,
       justification: 'Session reprise après déconnexion'
     })
   })
@@ -177,7 +181,7 @@ function forceStop() {
 document.addEventListener('DOMContentLoaded', () => {
   checkActiveSession();
   refreshLiveSessions();
-  setInterval(refreshLiveSessions, 30000); // Rafraîchir toutes les 30 secondes
+  setInterval(refreshLiveSessions, 30000);
 });
 
 function refreshLiveSessions() {
@@ -209,7 +213,6 @@ function refreshLiveSessions() {
     });
 }
 
-// Charger les users actifs au chargement
 let activeUsers = {};
 function refreshActiveUsers() {
   fetch('/active_users')
@@ -244,11 +247,13 @@ document.addEventListener('DOMContentLoaded', refreshActiveUsers);
 function loadServices() {
   clientId = document.getElementById('client-select').value;
   const serviceGroup = document.getElementById('service-group');
+  const noteGroup = document.getElementById('note-group');
   const colleaguesGroup = document.getElementById('colleagues-group');
   const startBtn = document.getElementById('start-btn');
 
   if (!clientId) {
     serviceGroup.style.display = 'none';
+    noteGroup.style.display = 'none';
     colleaguesGroup.style.display = 'none';
     startBtn.disabled = true;
     return;
@@ -263,6 +268,7 @@ function loadServices() {
         sel.innerHTML += '<option value="' + s.id + '" data-hours="' + s.monthly_hours + '">' + s.name + '</option>';
       });
       serviceGroup.style.display = 'block';
+      noteGroup.style.display = 'block';
       colleaguesGroup.style.display = 'block';
       startBtn.disabled = true;
     });
@@ -283,12 +289,20 @@ function startTimer() {
   serviceId = document.getElementById('service-select').value;
   if (!clientId || !serviceId) return;
 
+  // Récupérer la note utilisateur
+  userNote = document.getElementById('user-note').value.trim();
+
   const colleagues = [...document.querySelectorAll('.chip-active')].map(c => parseInt(c.dataset.id));
 
   fetch('/start_timer', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ client_id: parseInt(clientId), service_id: parseInt(serviceId), colleagues, started_at: localISO(new Date()) })
+    body: JSON.stringify({
+      client_id: parseInt(clientId),
+      service_id: parseInt(serviceId),
+      colleagues,
+      started_at: localISO(new Date())
+    })
   })
   .then(r => {
     if (r.status === 409) {
@@ -299,7 +313,7 @@ function startTimer() {
   .then(data => {
     sessionId = data.session_id;
     templateId = data.template_id;
-    startTimestamp = new Date();  // heure locale
+    startTimestamp = new Date();
     totalPauseMs = 0;
     isPaused = false;
 
@@ -309,6 +323,7 @@ function startTimer() {
     const allNames = ['{{ session.username }}', ...names];
 
     let ctx = '<strong>' + clientName + '</strong> — ' + serviceName;
+    if (userNote) ctx += '<br><small style="color:#999">📝 ' + userNote + '</small>';
     if (allNames.length > 1) ctx += '<br><small>' + allNames.join(', ') + '</small>';
     document.getElementById('timer-context').innerHTML = ctx;
 
@@ -372,11 +387,17 @@ function stopTimer() {
 }
 
 function confirmStop() {
-  const justification = document.getElementById('justify-text').value;
+  // Combiner note utilisateur + justification dépassement quota si besoin
+  const justifyExtra = document.getElementById('justify-text').value.trim();
+  let finalNote = userNote;
+  if (justifyExtra) {
+    finalNote = finalNote ? finalNote + ' | ' + justifyExtra : justifyExtra;
+  }
+
   const pauseMinutes = parseFloat(document.getElementById('justify-modal').dataset.pause || 0);
   document.getElementById('justify-modal').classList.add('hidden');
 
-  const endTimestamp = new Date();  // heure locale
+  const endTimestamp = new Date();
   fetch('/stop_timer', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -387,7 +408,7 @@ function confirmStop() {
       start_time: localISO(startTimestamp),
       end_time: localISO(endTimestamp),
       pause_minutes: pauseMinutes,
-      justification
+      justification: finalNote
     })
   })
   .then(r => r.json())

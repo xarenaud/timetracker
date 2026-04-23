@@ -117,7 +117,7 @@
           {% if session.role == 'admin' %}<th>Collaborateur</th>{% endif %}
           <th>Client</th>
           <th>Prestation</th>
-          <th>Note</th>
+          <th>Note session</th>
           <th>Début</th>
           <th>Fin</th>
           <th>Durée</th>
@@ -136,8 +136,8 @@
           <td>{{ e.client_name }}</td>
           <td>{{ e.service_name }}</td>
           <td>
-            {% if e.service_note %}
-              <span style="color:#666;font-size:12px;font-style:italic">{{ e.service_note }}</span>
+            {% if e.justification %}
+              <span style="color:#555;font-size:12px;font-style:italic">📝 {{ e.justification }}</span>
             {% else %}
               <span style="color:#ddd">—</span>
             {% endif %}
