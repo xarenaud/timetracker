@@ -14,10 +14,11 @@
     </div>
   </div>
 
-  <!-- FORMULAIRE DE DÉMARRAGE -->
+  <!-- FORMULAIRE PRINCIPAL -->
   <div class="card" id="start-form">
     <h2 class="page-title">⏱ Nouveau pointage</h2>
 
+    <!-- Sélection client -->
     <div class="form-group mb-3">
       <label class="field-label">Client</label>
       <select id="client-select" class="form-select form-select-lg" onchange="loadServices()">
@@ -28,6 +29,7 @@
       </select>
     </div>
 
+    <!-- Sélection service -->
     <div class="form-group mb-3" id="service-group" style="display:none">
       <label class="field-label">Prestation</label>
       <select id="service-select" class="form-select form-select-lg" onchange="checkReady()">
@@ -35,12 +37,13 @@
       </select>
     </div>
 
-    <!-- NOTE FACULTATIVE -->
+    <!-- Note facultative -->
     <div class="form-group mb-3" id="note-group" style="display:none">
-      <label class="field-label">📝 Note <small style="color:#999;font-weight:normal">(optionnel — ex: Logo v2, Réunion client...)</small></label>
-      <input type="text" id="user-note" class="form-input" placeholder="Décrivez brièvement ce sur quoi vous travaillez..."/>
+      <label class="field-label">📝 Note <small style="color:#999;font-weight:normal">(optionnel)</small></label>
+      <input type="text" id="user-note" class="form-input" placeholder="Ex: Logo v2, Réunion client, Correction maquette..."/>
     </div>
 
+    <!-- Collègues -->
     <div class="form-group mb-3" id="colleagues-group" style="display:none">
       <label class="field-label">Collègues (optionnel)</label>
       <div class="chips" id="colleague-chips">
@@ -52,9 +55,80 @@
       </div>
     </div>
 
-    <button class="btn btn-primary btn-full btn-lg" id="start-btn" onclick="startTimer()" disabled>
-      ▶ Démarrer
-    </button>
+    <!-- ── CHOIX DU MODE ── -->
+    <div class="form-group mb-3" id="mode-group" style="display:none">
+      <label class="field-label">Mode de pointage</label>
+      <div class="mode-tabs">
+        <button type="button" class="mode-tab active" id="tab-chrono" onclick="switchMode('chrono')">
+          ⏱ Chronomètre
+        </button>
+        <button type="button" class="mode-tab" id="tab-manual" onclick="switchMode('manual')">
+          ✏️ Encodage rapide
+        </button>
+      </div>
+    </div>
+
+    <!-- ── MODE CHRONO ── -->
+    <div id="mode-chrono" style="display:none">
+      <button class="btn btn-primary btn-full btn-lg" id="start-btn" onclick="startTimer()" disabled>
+        ▶ Démarrer le chrono
+      </button>
+    </div>
+
+    <!-- ── MODE ENCODAGE RAPIDE ── -->
+    <div id="mode-quick" style="display:none">
+
+      <!-- Date -->
+      <div class="form-row mb-3">
+        <div class="form-group">
+          <label class="field-label">📅 Date</label>
+          <input type="date" id="quick-date" class="form-input" />
+        </div>
+        <div class="form-group">
+          <label class="field-label">🕐 Heure de début</label>
+          <input type="time" id="quick-start-time" class="form-input" />
+        </div>
+      </div>
+
+      <!-- Boutons durée rapide -->
+      <div class="form-group mb-3">
+        <label class="field-label">Durée</label>
+        <div class="quick-duration-btns">
+          <button type="button" class="duration-btn" onclick="setDuration(15)">15 min</button>
+          <button type="button" class="duration-btn" onclick="setDuration(30)">30 min</button>
+          <button type="button" class="duration-btn" onclick="setDuration(45)">45 min</button>
+          <button type="button" class="duration-btn" onclick="setDuration(60)">1h</button>
+          <button type="button" class="duration-btn" onclick="setDuration(90)">1h30</button>
+          <button type="button" class="duration-btn" onclick="setDuration(120)">2h</button>
+        </div>
+      </div>
+
+      <!-- Ou X fois 15 minutes -->
+      <div class="form-group mb-3">
+        <label class="field-label">— ou — Nombre de blocs de 15 min</label>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button type="button" class="btn btn-secondary btn-xs" onclick="changeBlocks(-1)">−</button>
+          <span id="blocks-count" style="font-size:20px;font-weight:bold;min-width:30px;text-align:center">0</span>
+          <button type="button" class="btn btn-secondary btn-xs" onclick="changeBlocks(1)">+</button>
+          <span style="color:#666;font-size:13px">× 15 min</span>
+          <span id="blocks-total" style="color:#7B1C2E;font-weight:bold;font-size:15px;margin-left:8px"></span>
+        </div>
+      </div>
+
+      <!-- Durée totale calculée -->
+      <div class="form-group mb-2" id="quick-summary" style="display:none">
+        <div class="quick-summary-box">
+          <span>⏱ Durée encodée :</span>
+          <strong id="quick-duration-label" style="color:#7B1C2E;font-size:18px"></strong>
+          <span style="color:#999;font-size:12px" id="quick-time-range"></span>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-full btn-lg" id="quick-save-btn" onclick="saveQuickEntry()" disabled>
+        💾 Enregistrer
+      </button>
+    </div>
+
   </div>
 
   <!-- TIMER EN COURS -->
@@ -88,6 +162,34 @@
 
 </div>
 
+<style>
+.mode-tabs { display:flex; gap:8px; margin-bottom:4px; }
+.mode-tab {
+  flex:1; padding:10px; border:2px solid #ddd; background:#fff;
+  border-radius:8px; cursor:pointer; font-size:14px; font-weight:600;
+  transition:all 0.2s;
+}
+.mode-tab.active {
+  border-color:#7B1C2E; background:#7B1C2E; color:#fff;
+}
+.quick-duration-btns {
+  display:flex; flex-wrap:wrap; gap:8px;
+}
+.duration-btn {
+  padding:8px 16px; border:2px solid #ddd; background:#fff;
+  border-radius:20px; cursor:pointer; font-size:14px; font-weight:600;
+  transition:all 0.2s;
+}
+.duration-btn.active {
+  border-color:#7B1C2E; background:#7B1C2E; color:#fff;
+}
+.quick-summary-box {
+  background:#f9f0f2; border:1px solid #e8c4cc; border-radius:8px;
+  padding:12px 16px; display:flex; align-items:center; gap:12px;
+  flex-wrap:wrap;
+}
+</style>
+
 <script>
 function localISO(d) {
   return d.getFullYear() + '-' +
@@ -96,6 +198,10 @@ function localISO(d) {
     String(d.getHours()).padStart(2,'0') + ':' +
     String(d.getMinutes()).padStart(2,'0') + ':' +
     String(d.getSeconds()).padStart(2,'0');
+}
+
+function dateToISO(dateStr, timeStr) {
+  return dateStr + 'T' + timeStr + ':00';
 }
 
 let timerInterval = null;
@@ -108,6 +214,169 @@ let pauseStart = null;
 let totalPauseMs = 0;
 let isPaused = false;
 let userNote = '';
+let currentMode = 'chrono';
+let quickDurationMin = 0;
+let blocksCount = 0;
+
+// ── INIT DATES MODE RAPIDE ──────────────────────────────────────────────────
+function initQuickDefaults() {
+  const now = new Date();
+  // Date = aujourd'hui
+  document.getElementById('quick-date').value = now.toISOString().slice(0,10);
+  // Heure début = maintenant
+  document.getElementById('quick-start-time').value =
+    String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+}
+
+// ── MODE SWITCH ─────────────────────────────────────────────────────────────
+function switchMode(mode) {
+  currentMode = mode;
+  document.getElementById('tab-chrono').classList.toggle('active', mode === 'chrono');
+  document.getElementById('tab-manual').classList.toggle('active', mode === 'manual');
+  document.getElementById('mode-chrono').style.display = mode === 'chrono' ? 'block' : 'none';
+  document.getElementById('mode-quick').style.display = mode === 'manual' ? 'block' : 'none';
+  if (mode === 'manual') initQuickDefaults();
+}
+
+// ── DURÉE RAPIDE ────────────────────────────────────────────────────────────
+function setDuration(min) {
+  quickDurationMin = min;
+  blocksCount = Math.round(min / 15);
+  document.getElementById('blocks-count').textContent = blocksCount;
+  document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  updateBlocksTotal();
+  updateQuickSummary();
+}
+
+function changeBlocks(delta) {
+  blocksCount = Math.max(0, blocksCount + delta);
+  quickDurationMin = blocksCount * 15;
+  document.getElementById('blocks-count').textContent = blocksCount;
+  // Désélectionner les boutons rapides
+  document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+  // Réactiver le bon bouton si correspond
+  document.querySelectorAll('.duration-btn').forEach(b => {
+    if (parseInt(b.textContent) === quickDurationMin ||
+        b.textContent.trim() === formatDuration(quickDurationMin)) {
+      b.classList.add('active');
+    }
+  });
+  updateBlocksTotal();
+  updateQuickSummary();
+}
+
+function updateBlocksTotal() {
+  const el = document.getElementById('blocks-total');
+  if (blocksCount > 0) {
+    el.textContent = '= ' + formatDuration(quickDurationMin);
+  } else {
+    el.textContent = '';
+  }
+}
+
+function formatDuration(min) {
+  if (min < 60) return min + ' min';
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? h + 'h' + String(m).padStart(2,'0') : h + 'h';
+}
+
+function updateQuickSummary() {
+  const summary = document.getElementById('quick-summary');
+  const saveBtn = document.getElementById('quick-save-btn');
+
+  if (quickDurationMin <= 0) {
+    summary.style.display = 'none';
+    saveBtn.disabled = true;
+    return;
+  }
+
+  // Calculer start/end
+  const dateVal = document.getElementById('quick-date').value;
+  const timeVal = document.getElementById('quick-start-time').value;
+
+  let startDt = null;
+  let endDt = null;
+
+  if (dateVal && timeVal) {
+    startDt = new Date(dateVal + 'T' + timeVal + ':00');
+    endDt = new Date(startDt.getTime() + quickDurationMin * 60000);
+  } else {
+    // Automatique : maintenant - durée
+    endDt = new Date();
+    startDt = new Date(endDt.getTime() - quickDurationMin * 60000);
+    // Mettre à jour les champs
+    document.getElementById('quick-date').value = endDt.toISOString().slice(0,10);
+    document.getElementById('quick-start-time').value =
+      String(startDt.getHours()).padStart(2,'0') + ':' + String(startDt.getMinutes()).padStart(2,'0');
+  }
+
+  const fmt = (d) => String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  document.getElementById('quick-duration-label').textContent = formatDuration(quickDurationMin);
+  document.getElementById('quick-time-range').textContent =
+    '(' + fmt(startDt) + ' → ' + fmt(endDt) + ')';
+
+  summary.style.display = 'block';
+
+  // Activer le bouton save si client + service sélectionnés
+  const client = document.getElementById('client-select').value;
+  const service = document.getElementById('service-select').value;
+  saveBtn.disabled = !(client && service && quickDurationMin > 0);
+}
+
+// Recalculer le summary quand on change date/heure
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('quick-date').addEventListener('change', updateQuickSummary);
+  document.getElementById('quick-start-time').addEventListener('change', updateQuickSummary);
+});
+
+// ── SAVE ENCODAGE RAPIDE ────────────────────────────────────────────────────
+function saveQuickEntry() {
+  const client = document.getElementById('client-select').value;
+  const service = document.getElementById('service-select').value;
+  if (!client || !service || quickDurationMin <= 0) return;
+
+  const dateVal = document.getElementById('quick-date').value;
+  const timeVal = document.getElementById('quick-start-time').value;
+  const note = document.getElementById('user-note').value.trim();
+
+  let startDt, endDt;
+  if (dateVal && timeVal) {
+    startDt = new Date(dateVal + 'T' + timeVal + ':00');
+  } else {
+    startDt = new Date(Date.now() - quickDurationMin * 60000);
+  }
+  endDt = new Date(startDt.getTime() + quickDurationMin * 60000);
+
+  // Récupérer template_id depuis le service sélectionné
+  const serviceOption = document.getElementById('service-select').selectedOptions[0];
+  const colleagues = [...document.querySelectorAll('.chip-active')].map(c => parseInt(c.dataset.id));
+
+  fetch('/quick_entry', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      client_id: parseInt(client),
+      service_id: parseInt(service),
+      colleagues: colleagues,
+      start_time: localISO(startDt),
+      end_time: localISO(endDt),
+      duration_minutes: quickDurationMin,
+      justification: note
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      alert('✅ Pointage enregistré : ' + formatDuration(quickDurationMin));
+      location.reload();
+    } else {
+      alert('❌ Erreur : ' + (data.error || 'Inconnue'));
+    }
+  })
+  .catch(() => alert('❌ Erreur réseau'));
+}
 
 // ── REPRISE SESSION ACTIVE ──────────────────────────────────────────────────
 let resumeSessionId = null;
@@ -124,19 +393,15 @@ function checkActiveSession() {
         resumeSessionId = data.session_id;
         resumeClientId = data.client_id;
         resumeStartTime = new Date(data.started_at);
-
         const svc = data.services.length > 0 ? data.services[0] : null;
         if (svc) resumeTemplateId = svc.template_id;
-
         const svcName = svc ? svc.name : 'Prestation inconnue';
         document.getElementById('resume-context').innerHTML =
           '<strong>' + data.client_name + '</strong> — ' + svcName +
           '<br><small>Démarrée le ' + resumeStartTime.toLocaleDateString('fr-BE') +
           ' à ' + resumeStartTime.toLocaleTimeString('fr-BE', {hour:'2-digit', minute:'2-digit'}) + '</small>';
-
         document.getElementById('resume-session').classList.remove('hidden');
         document.getElementById('start-form').classList.add('hidden');
-
         resumeInterval = setInterval(updateResumeDisplay, 1000);
       }
     });
@@ -155,7 +420,6 @@ function forceStop() {
   if (!confirm('Confirmes-tu la fin de cette session ?')) return;
   clearInterval(resumeInterval);
   const endTimestamp = new Date();
-
   fetch('/stop_timer', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -182,6 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
   checkActiveSession();
   refreshLiveSessions();
   setInterval(refreshLiveSessions, 30000);
+  refreshActiveUsers();
 });
 
 function refreshLiveSessions() {
@@ -199,13 +464,12 @@ function refreshLiveSessions() {
         const elapsed = Date.now() - started.getTime();
         const h = Math.floor(elapsed / 3600000);
         const m = Math.floor((elapsed % 3600000) / 60000);
-        const duration = h + 'h' + String(m).padStart(2,'0');
         const isMe = u.user_id === {{ session.user_id }};
         html += '<div class="live-session-chip' + (isMe ? ' live-session-me' : '') + '">' +
           '<span class="live-dot">🟢</span>' +
           '<strong>' + u.username + '</strong>' +
           '<span class="live-client">' + u.client_name + '</span>' +
-          '<span class="live-duration">⏱ ' + duration + '</span>' +
+          '<span class="live-duration">⏱ ' + h + 'h' + String(m).padStart(2,'0') + '</span>' +
           '</div>';
       });
       html += '</div>';
@@ -242,20 +506,22 @@ function updateChips() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', refreshActiveUsers);
-
 function loadServices() {
   clientId = document.getElementById('client-select').value;
   const serviceGroup = document.getElementById('service-group');
   const noteGroup = document.getElementById('note-group');
   const colleaguesGroup = document.getElementById('colleagues-group');
-  const startBtn = document.getElementById('start-btn');
+  const modeGroup = document.getElementById('mode-group');
+  const modeQuick = document.getElementById('mode-quick');
+  const modeChrono = document.getElementById('mode-chrono');
 
   if (!clientId) {
     serviceGroup.style.display = 'none';
     noteGroup.style.display = 'none';
     colleaguesGroup.style.display = 'none';
-    startBtn.disabled = true;
+    modeGroup.style.display = 'none';
+    modeChrono.style.display = 'none';
+    modeQuick.style.display = 'none';
     return;
   }
 
@@ -270,7 +536,10 @@ function loadServices() {
       serviceGroup.style.display = 'block';
       noteGroup.style.display = 'block';
       colleaguesGroup.style.display = 'block';
-      startBtn.disabled = true;
+      modeGroup.style.display = 'block';
+      // Afficher le mode actuel
+      switchMode(currentMode);
+      document.getElementById('start-btn').disabled = true;
     });
 }
 
@@ -278,36 +547,33 @@ function checkReady() {
   const client = document.getElementById('client-select').value;
   const service = document.getElementById('service-select').value;
   document.getElementById('start-btn').disabled = !(client && service);
+  // Mettre à jour aussi le bouton quick
+  const saveBtn = document.getElementById('quick-save-btn');
+  if (saveBtn) saveBtn.disabled = !(client && service && quickDurationMin > 0);
 }
 
 function toggleColleague(el) {
   el.classList.toggle('chip-active');
 }
 
+// ── CHRONO ──────────────────────────────────────────────────────────────────
 function startTimer() {
   clientId = document.getElementById('client-select').value;
   serviceId = document.getElementById('service-select').value;
   if (!clientId || !serviceId) return;
-
-  // Récupérer la note utilisateur
   userNote = document.getElementById('user-note').value.trim();
-
   const colleagues = [...document.querySelectorAll('.chip-active')].map(c => parseInt(c.dataset.id));
 
   fetch('/start_timer', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      client_id: parseInt(clientId),
-      service_id: parseInt(serviceId),
-      colleagues,
-      started_at: localISO(new Date())
+      client_id: parseInt(clientId), service_id: parseInt(serviceId),
+      colleagues, started_at: localISO(new Date())
     })
   })
   .then(r => {
-    if (r.status === 409) {
-      return r.json().then(d => { throw new Error(d.error); });
-    }
+    if (r.status === 409) return r.json().then(d => { throw new Error(d.error); });
     return r.json();
   })
   .then(data => {
@@ -326,15 +592,11 @@ function startTimer() {
     if (userNote) ctx += '<br><small style="color:#999">📝 ' + userNote + '</small>';
     if (allNames.length > 1) ctx += '<br><small>' + allNames.join(', ') + '</small>';
     document.getElementById('timer-context').innerHTML = ctx;
-
     document.getElementById('start-form').classList.add('hidden');
     document.getElementById('timer-running').classList.remove('hidden');
-
     timerInterval = setInterval(updateDisplay, 1000);
   })
-  .catch(err => {
-    alert('⚠️ ' + err.message);
-  });
+  .catch(err => alert('⚠️ ' + err.message));
 }
 
 function updateDisplay() {
@@ -374,11 +636,9 @@ function stopTimer() {
   const pauseMs = isPaused ? (totalPauseMs + (Date.now() - pauseStart)) : totalPauseMs;
   const pauseMinutes = pauseMs / 60000;
   document.getElementById('justify-modal').dataset.pause = pauseMinutes;
-
   const opt = document.getElementById('service-select').selectedOptions[0];
   const quota = parseFloat(opt.dataset.hours || 0);
   const elapsedMin = (Date.now() - startTimestamp.getTime() - pauseMs) / 60000;
-
   if (quota > 0 && elapsedMin > quota * 60) {
     document.getElementById('justify-modal').classList.remove('hidden');
   } else {
@@ -387,28 +647,19 @@ function stopTimer() {
 }
 
 function confirmStop() {
-  // Combiner note utilisateur + justification dépassement quota si besoin
   const justifyExtra = document.getElementById('justify-text').value.trim();
   let finalNote = userNote;
-  if (justifyExtra) {
-    finalNote = finalNote ? finalNote + ' | ' + justifyExtra : justifyExtra;
-  }
-
+  if (justifyExtra) finalNote = finalNote ? finalNote + ' | ' + justifyExtra : justifyExtra;
   const pauseMinutes = parseFloat(document.getElementById('justify-modal').dataset.pause || 0);
   document.getElementById('justify-modal').classList.add('hidden');
-
   const endTimestamp = new Date();
   fetch('/stop_timer', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      session_id: sessionId,
-      client_id: parseInt(clientId),
-      template_id: templateId,
-      start_time: localISO(startTimestamp),
-      end_time: localISO(endTimestamp),
-      pause_minutes: pauseMinutes,
-      justification: finalNote
+      session_id: sessionId, client_id: parseInt(clientId), template_id: templateId,
+      start_time: localISO(startTimestamp), end_time: localISO(endTimestamp),
+      pause_minutes: pauseMinutes, justification: finalNote
     })
   })
   .then(r => r.json())
