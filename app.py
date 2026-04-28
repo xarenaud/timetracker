@@ -1314,6 +1314,52 @@ def save_collab_settings():
     month = request.form.get('month', datetime.now().strftime('%Y-%m'))
     return redirect(url_for('dashboard', month=month))
 
+  
+@app.route('/quick_entry', methods=['POST'])  
+@login_required  
+def quick_entry():  
+    import uuid  
+    data = request.get_json()  
+    client_id = data['client_id']  
+    service_id = data['service_id']  
+    colleagues = data.get('colleagues', [])  
+    start_time_raw = data['start_time']  
+    end_time_raw = data['end_time']  
+    duration_minutes = float(data.get('duration_minutes', 0))  
+    justification = data.get('justification', '')
+
+    def clean_iso(ts):  
+        ts = ts.replace('Z', '')  
+        if '.' in ts:  
+            ts = ts.split('.')[0]  
+        return ts
+
+    start_time = clean_iso(start_time_raw)  
+    end_time = clean_iso(end_time_raw)
+
+    conn = get_db()  
+    c = conn.cursor()
+
+    c.execute(f"SELECT template_id FROM client_services WHERE id={PLACEHOLDER}", (service_id,))  
+    row = c.fetchone()  
+    if not row:  
+        conn.close()  
+        return jsonify({'error': 'Service introuvable'}), 404  
+    template_id = row[0] if USE_PG else row['template_id']
+
+    session_id = str(uuid.uuid4())  
+    user_ids = list(set([session['user_id']] + colleagues))
+
+    for uid in user_ids:  
+        c.execute(f"""INSERT INTO time_entries  
+            (user_id, client_id, template_id, start_time, end_time, duration_minutes, pause_minutes, is_manual, justification, session_id)  
+            VALUES ({P(10)})""",  
+            (uid, client_id, template_id, start_time, end_time, duration_minutes, 0, 1, justification, session_id))
+
+    conn.commit()  
+    conn.close()  
+    return jsonify({'success': True, 'duration_minutes': duration_minutes})
+
 # Enregistrer les routes d'export
 from export_routes import register_export_routes
 register_export_routes(app, get_db, USE_PG, PLACEHOLDER, P, get_working_days)
