@@ -21,7 +21,7 @@
     <!-- Sélection client -->
     <div class="form-group mb-3">
       <label class="field-label">Client</label>
-      <select id="client-select" class="form-select form-select-lg" onchange="loadServices()">
+      <select id="client-select" class="form-select form-select-lg" onchange="loadServices(true)">
         <option value="">— Sélectionner un client —</option>
         {% for c in clients %}
           <option value="{{ c.id }}">{{ c.name }}</option>
@@ -32,7 +32,7 @@
     <!-- Sélection service -->
     <div class="form-group mb-3" id="service-group" style="display:none">
       <label class="field-label">Prestation</label>
-      <select id="service-select" class="form-select form-select-lg" onchange="checkReady()">
+      <select id="service-select" class="form-select form-select-lg" onchange="checkReady(); saveLastChoice();">
         <option value="">— Sélectionner une prestation —</option>
       </select>
     </div>
@@ -172,21 +172,16 @@
 .mode-tab.active {
   border-color:#7B1C2E; background:#7B1C2E; color:#fff;
 }
-.quick-duration-btns {
-  display:flex; flex-wrap:wrap; gap:8px;
-}
+.quick-duration-btns { display:flex; flex-wrap:wrap; gap:8px; }
 .duration-btn {
   padding:8px 16px; border:2px solid #ddd; background:#fff;
   border-radius:20px; cursor:pointer; font-size:14px; font-weight:600;
   transition:all 0.2s;
 }
-.duration-btn.active {
-  border-color:#7B1C2E; background:#7B1C2E; color:#fff;
-}
+.duration-btn.active { border-color:#7B1C2E; background:#7B1C2E; color:#fff; }
 .quick-summary-box {
   background:#f9f0f2; border:1px solid #e8c4cc; border-radius:8px;
-  padding:12px 16px; display:flex; align-items:center; gap:12px;
-  flex-wrap:wrap;
+  padding:12px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
 }
 </style>
 
@@ -198,10 +193,6 @@ function localISO(d) {
     String(d.getHours()).padStart(2,'0') + ':' +
     String(d.getMinutes()).padStart(2,'0') + ':' +
     String(d.getSeconds()).padStart(2,'0');
-}
-
-function dateToISO(dateStr, timeStr) {
-  return dateStr + 'T' + timeStr + ':00';
 }
 
 let timerInterval = null;
@@ -218,12 +209,42 @@ let currentMode = 'chrono';
 let quickDurationMin = 0;
 let blocksCount = 0;
 
+// ── MÉMORISATION DERNIER CHOIX ──────────────────────────────────────────────
+const STORAGE_KEY = 'cx_timer_last_{{ session.user_id }}';
+
+function saveLastChoice() {
+  const clientSel = document.getElementById('client-select');
+  const serviceSel = document.getElementById('service-select');
+  const data = {
+    client_id: clientSel.value,
+    client_name: clientSel.selectedOptions[0]?.text || '',
+    service_id: serviceSel.value,
+    service_name: serviceSel.selectedOptions[0]?.text || ''
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function restoreLastChoice() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+    const data = JSON.parse(saved);
+    if (!data.client_id) return;
+
+    // Sélectionner le client
+    const clientSel = document.getElementById('client-select');
+    clientSel.value = data.client_id;
+    if (clientSel.value !== data.client_id) return; // client n'existe plus
+
+    // Charger les services puis sélectionner le bon
+    loadServices(false, data.service_id);
+  } catch(e) {}
+}
+
 // ── INIT DATES MODE RAPIDE ──────────────────────────────────────────────────
 function initQuickDefaults() {
   const now = new Date();
-  // Date = aujourd'hui
   document.getElementById('quick-date').value = now.toISOString().slice(0,10);
-  // Heure début = maintenant
   document.getElementById('quick-start-time').value =
     String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
 }
@@ -253,26 +274,14 @@ function changeBlocks(delta) {
   blocksCount = Math.max(0, blocksCount + delta);
   quickDurationMin = blocksCount * 15;
   document.getElementById('blocks-count').textContent = blocksCount;
-  // Désélectionner les boutons rapides
   document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
-  // Réactiver le bon bouton si correspond
-  document.querySelectorAll('.duration-btn').forEach(b => {
-    if (parseInt(b.textContent) === quickDurationMin ||
-        b.textContent.trim() === formatDuration(quickDurationMin)) {
-      b.classList.add('active');
-    }
-  });
   updateBlocksTotal();
   updateQuickSummary();
 }
 
 function updateBlocksTotal() {
   const el = document.getElementById('blocks-total');
-  if (blocksCount > 0) {
-    el.textContent = '= ' + formatDuration(quickDurationMin);
-  } else {
-    el.textContent = '';
-  }
+  el.textContent = blocksCount > 0 ? '= ' + formatDuration(quickDurationMin) : '';
 }
 
 function formatDuration(min) {
@@ -285,47 +294,33 @@ function formatDuration(min) {
 function updateQuickSummary() {
   const summary = document.getElementById('quick-summary');
   const saveBtn = document.getElementById('quick-save-btn');
-
   if (quickDurationMin <= 0) {
     summary.style.display = 'none';
     saveBtn.disabled = true;
     return;
   }
-
-  // Calculer start/end
   const dateVal = document.getElementById('quick-date').value;
   const timeVal = document.getElementById('quick-start-time').value;
-
-  let startDt = null;
-  let endDt = null;
-
+  let startDt, endDt;
   if (dateVal && timeVal) {
     startDt = new Date(dateVal + 'T' + timeVal + ':00');
     endDt = new Date(startDt.getTime() + quickDurationMin * 60000);
   } else {
-    // Automatique : maintenant - durée
     endDt = new Date();
     startDt = new Date(endDt.getTime() - quickDurationMin * 60000);
-    // Mettre à jour les champs
     document.getElementById('quick-date').value = endDt.toISOString().slice(0,10);
     document.getElementById('quick-start-time').value =
       String(startDt.getHours()).padStart(2,'0') + ':' + String(startDt.getMinutes()).padStart(2,'0');
   }
-
   const fmt = (d) => String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
   document.getElementById('quick-duration-label').textContent = formatDuration(quickDurationMin);
-  document.getElementById('quick-time-range').textContent =
-    '(' + fmt(startDt) + ' → ' + fmt(endDt) + ')';
-
+  document.getElementById('quick-time-range').textContent = '(' + fmt(startDt) + ' → ' + fmt(endDt) + ')';
   summary.style.display = 'block';
-
-  // Activer le bouton save si client + service sélectionnés
   const client = document.getElementById('client-select').value;
   const service = document.getElementById('service-select').value;
   saveBtn.disabled = !(client && service && quickDurationMin > 0);
 }
 
-// Recalculer le summary quand on change date/heure
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('quick-date').addEventListener('change', updateQuickSummary);
   document.getElementById('quick-start-time').addEventListener('change', updateQuickSummary);
@@ -336,11 +331,9 @@ function saveQuickEntry() {
   const client = document.getElementById('client-select').value;
   const service = document.getElementById('service-select').value;
   if (!client || !service || quickDurationMin <= 0) return;
-
   const dateVal = document.getElementById('quick-date').value;
   const timeVal = document.getElementById('quick-start-time').value;
   const note = document.getElementById('user-note').value.trim();
-
   let startDt, endDt;
   if (dateVal && timeVal) {
     startDt = new Date(dateVal + 'T' + timeVal + ':00');
@@ -348,22 +341,14 @@ function saveQuickEntry() {
     startDt = new Date(Date.now() - quickDurationMin * 60000);
   }
   endDt = new Date(startDt.getTime() + quickDurationMin * 60000);
-
-  // Récupérer template_id depuis le service sélectionné
-  const serviceOption = document.getElementById('service-select').selectedOptions[0];
   const colleagues = [...document.querySelectorAll('.chip-active')].map(c => parseInt(c.dataset.id));
-
   fetch('/quick_entry', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      client_id: parseInt(client),
-      service_id: parseInt(service),
-      colleagues: colleagues,
-      start_time: localISO(startDt),
-      end_time: localISO(endDt),
-      duration_minutes: quickDurationMin,
-      justification: note
+      client_id: parseInt(client), service_id: parseInt(service),
+      colleagues, start_time: localISO(startDt), end_time: localISO(endDt),
+      duration_minutes: quickDurationMin, justification: note
     })
   })
   .then(r => r.json())
@@ -403,6 +388,9 @@ function checkActiveSession() {
         document.getElementById('resume-session').classList.remove('hidden');
         document.getElementById('start-form').classList.add('hidden');
         resumeInterval = setInterval(updateResumeDisplay, 1000);
+      } else {
+        // Pas de session active → restaurer le dernier choix
+        restoreLastChoice();
       }
     });
 }
@@ -424,13 +412,9 @@ function forceStop() {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      session_id: resumeSessionId,
-      client_id: resumeClientId,
-      template_id: resumeTemplateId,
-      start_time: localISO(resumeStartTime),
-      end_time: localISO(endTimestamp),
-      pause_minutes: 0,
-      justification: 'Session reprise après déconnexion'
+      session_id: resumeSessionId, client_id: resumeClientId, template_id: resumeTemplateId,
+      start_time: localISO(resumeStartTime), end_time: localISO(endTimestamp),
+      pause_minutes: 0, justification: 'Session reprise après déconnexion'
     })
   })
   .then(r => r.json())
@@ -506,24 +490,26 @@ function updateChips() {
   });
 }
 
-function loadServices() {
+// saveServiceId = ID du service à resélectionner après chargement (pour restore)
+function loadServices(saveChoice, restoreServiceId) {
   clientId = document.getElementById('client-select').value;
   const serviceGroup = document.getElementById('service-group');
   const noteGroup = document.getElementById('note-group');
   const colleaguesGroup = document.getElementById('colleagues-group');
   const modeGroup = document.getElementById('mode-group');
-  const modeQuick = document.getElementById('mode-quick');
-  const modeChrono = document.getElementById('mode-chrono');
 
   if (!clientId) {
     serviceGroup.style.display = 'none';
     noteGroup.style.display = 'none';
     colleaguesGroup.style.display = 'none';
     modeGroup.style.display = 'none';
-    modeChrono.style.display = 'none';
-    modeQuick.style.display = 'none';
+    document.getElementById('mode-chrono').style.display = 'none';
+    document.getElementById('mode-quick').style.display = 'none';
     return;
   }
+
+  // Sauvegarder le choix client immédiatement
+  if (saveChoice) saveLastChoice();
 
   fetch('/get_services/' + clientId)
     .then(r => r.json())
@@ -533,13 +519,21 @@ function loadServices() {
       data.forEach(s => {
         sel.innerHTML += '<option value="' + s.id + '" data-hours="' + s.monthly_hours + '">' + s.name + '</option>';
       });
+
       serviceGroup.style.display = 'block';
       noteGroup.style.display = 'block';
       colleaguesGroup.style.display = 'block';
       modeGroup.style.display = 'block';
-      // Afficher le mode actuel
       switchMode(currentMode);
       document.getElementById('start-btn').disabled = true;
+
+      // Restaurer le service mémorisé si demandé
+      if (restoreServiceId) {
+        sel.value = restoreServiceId;
+        if (sel.value === restoreServiceId) {
+          checkReady();
+        }
+      }
     });
 }
 
@@ -547,9 +541,9 @@ function checkReady() {
   const client = document.getElementById('client-select').value;
   const service = document.getElementById('service-select').value;
   document.getElementById('start-btn').disabled = !(client && service);
-  // Mettre à jour aussi le bouton quick
   const saveBtn = document.getElementById('quick-save-btn');
   if (saveBtn) saveBtn.disabled = !(client && service && quickDurationMin > 0);
+  if (client && service) saveLastChoice();
 }
 
 function toggleColleague(el) {
@@ -582,12 +576,10 @@ function startTimer() {
     startTimestamp = new Date();
     totalPauseMs = 0;
     isPaused = false;
-
     const clientName = document.getElementById('client-select').selectedOptions[0].text;
     const serviceName = document.getElementById('service-select').selectedOptions[0].text;
     const names = [...document.querySelectorAll('.chip-active')].map(c => c.textContent);
     const allNames = ['{{ session.username }}', ...names];
-
     let ctx = '<strong>' + clientName + '</strong> — ' + serviceName;
     if (userNote) ctx += '<br><small style="color:#999">📝 ' + userNote + '</small>';
     if (allNames.length > 1) ctx += '<br><small>' + allNames.join(', ') + '</small>';
