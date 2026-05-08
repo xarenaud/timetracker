@@ -3,7 +3,9 @@ from datetime import datetime
 import os, hashlib, math
 
 app = Flask(__name__)
-app.secret_key = 'cxmedia-secret-2024'
+app.secret_key = 'cxmedia-secret-2024'  
+app.config['PERMANENT_SESSION_LIFETIME'] = __import__('datetime').timedelta(days=30)  
+app.config['SESSION_PERMANENT'] = True
 
 # ── JOURS FÉRIÉS BELGES ───────────────────────────────────────────────────────
 
@@ -322,6 +324,7 @@ def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if 'user_id' not in session or session.get('role') != 'admin':
+            session.permanent = True  
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated

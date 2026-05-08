@@ -1,330 +1,367 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="admin-page">
-  <h2 class="page-title">⚙️ Administration</h2>
+{% extends 'base.html' %}
 
-  <!-- Sessions actives -->
-  <div class="card" style="margin-bottom:16px;border-left:4px solid var(--warning)">
-    <h3 class="card-title">⚠️ Sessions actives — Gestion</h3>
-    <div id="admin-sessions-list">Chargement...</div>
-    <form method="POST" action="{{ url_for('clear_sessions') }}" style="margin-top:12px">
-      <input type="hidden" name="user_id" value=""/>
-      <button type="submit" class="btn btn-warning"
-        onclick="return confirm('Vider TOUTES les sessions actives ?')"
-        style="font-size:13px">
-        🧹 Vider toutes les sessions bloquées
-      </button>
+{% block title %}Administration{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">⚙️ Administration</h1>
+  <p class="page-subtitle">Gestion complète des utilisateurs, clients et nomenclature</p>
+</div>
+
+<!-- UTILISATEURS -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">👥 Utilisateurs</span>
+    <button class="btn btn-primary btn-sm" onclick="toggleSection('add-user')">➕ Ajouter</button>
+  </div>
+
+  <div id="add-user" style="display:none;background:var(--gray-lt);border-radius:8px;padding:16px;margin-bottom:16px;">
+    <div style="font-weight:700;color:var(--steel);margin-bottom:12px;">➕ Nouvel utilisateur</div>
+    <form method="POST" action="/admin/user/add">
+      <div class="form-row">
+        <div class="form-group"><input type="text" name="full_name" class="form-input" placeholder="Nom complet *" required></div>
+        <div class="form-group"><input type="text" name="username" class="form-input" placeholder="Identifiant *" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><input type="password" name="password" class="form-input" placeholder="Mot de passe *" required></div>
+        <div class="form-group"><input type="email" name="email" class="form-input" placeholder="Email"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <select name="role" class="form-select">
+            <option value="technicien">👷 Technicien</option>
+            <option value="commercial">💼 Commercial</option>
+            <option value="responsable">🔧 Responsable technique</option>
+            <option value="manager">📊 Manager</option>
+            <option value="admin">⚙️ Admin</option>
+          </select>
+        </div>
+        <div class="form-group"><button type="submit" class="btn btn-green btn-full">✅ Créer</button></div>
+      </div>
     </form>
   </div>
 
-  <div class="admin-grid">
-
-    <!-- Users -->
-    <div class="card">
-      <h3 class="card-title">👥 Utilisateurs</h3>
-      <form method="POST" action="{{ url_for('add_user') }}" class="inline-form">
-        <input type="text" name="username" placeholder="Nom d'utilisateur" required class="form-input"/>
-        <input type="password" name="password" placeholder="Mot de passe" required class="form-input"/>
-        <select name="role" class="form-select">
-          <option value="user">Utilisateur</option>
-          <option value="admin">Admin</option>
-        </select>
-        <button type="submit" class="btn btn-primary">+ Ajouter</button>
-      </form>
-      <table class="table mt-2">
-        <thead><tr><th>Nom</th><th>Rôle</th><th>Statut</th><th>Actions</th></tr></thead>
-        <tbody>
-          {% for u in users %}
-          <tr>
-            <td>{{ u.username }}</td>
-            <td><span class="badge {% if u.role == 'admin' %}badge-danger{% else %}badge-secondary{% endif %}">{{ u.role }}</span></td>
-            <td><span class="badge {% if u.active %}badge-success{% else %}badge-warning{% endif %}">{{ 'Actif' if u.active else 'Désactivé' }}</span></td>
-            <td>
-              <a href="{{ url_for('toggle_user', uid=u.id) }}" class="btn btn-xs btn-secondary">{{ '🔒' if u.active else '🔓' }}</a>
-              <a href="{{ url_for('delete_user', uid=u.id) }}" class="btn btn-xs btn-danger"
-                 onclick="return confirm('Supprimer {{ u.username }} ?')">🗑</a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Clients -->
-    <div class="card">
-      <h3 class="card-title">🏢 Clients</h3>
-
-      <!-- Formulaire création client + services -->
-      <div class="new-client-box">
-        <form method="POST" action="{{ url_for('add_client') }}">
-          <div class="form-group mb-3">
-            <label class="field-label">Nom du client</label>
-            <input type="text" name="client_name" placeholder="Nom du client" required class="form-input"/>
-          </div>
-          {% if templates %}
-          <div class="form-group mb-3">
-            <label class="field-label">Services assignés (optionnel)</label>
-            <div class="services-checklist">
-              {% for t in templates %}
-              <div class="service-check-row">
-                <label class="chip-check">
-                  <input type="checkbox" name="selected_{{ t.id }}" value="1"
-                    onchange="toggleHoursNew(this, {{ t.id }})"/>
-                  {{ t.name }}
-                </label>
-                <input type="number" name="hours_{{ t.id }}" placeholder="h/mois"
-                  step="0.5" min="0" class="form-input form-input-xs"/>
-                <input type="text" name="note_{{ t.id }}" placeholder="Note (optionnel)"
-                  class="form-input form-input-xs" style="min-width:140px"/>
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-          {% endif %}
-          <button type="submit" class="btn btn-primary">+ Créer le client</button>
+  <table class="data-table">
+    <thead>
+      <tr><th>Nom</th><th>Login</th><th>Rôle</th><th>Email</th><th>Statut</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+    {% for u in users %}
+    <tr id="user-row-{{ u.id }}">
+      <td><strong>{{ u.full_name or u.username }}</strong></td>
+      <td><code>{{ u.username }}</code></td>
+      <td>
+        {% set role_labels = {'admin':'⚙️ Admin','manager':'📊 Manager','responsable':'🔧 Resp. Tech','commercial':'💼 Commercial','technicien':'👷 Technicien'} %}
+        {{ role_labels.get(u.role, u.role) }}
+      </td>
+      <td>{{ u.email or '—' }}</td>
+      <td>
+        {% if u.active %}
+        <span class="badge badge-success">Actif</span>
+        {% else %}
+        <span class="badge badge-danger">Inactif</span>
+        {% endif %}
+      </td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-steel" onclick="editUser({{ u.id }}, '{{ u.full_name or '' }}', '{{ u.username }}', '{{ u.role }}', '{{ u.email or '' }}')">✏️ Modifier</button>
+        {% if u.username != 'admin' %}
+        <form method="POST" action="/admin/user/toggle/{{ u.id }}" style="display:inline;">
+          <button type="submit" class="btn btn-sm {{ 'btn-danger' if u.active else 'btn-green' }}">
+            {{ '🔴 Désactiver' if u.active else '🟢 Activer' }}
+          </button>
         </form>
+        <form method="POST" action="/admin/user/delete/{{ u.id }}" style="display:inline;" onsubmit="return confirm('Supprimer {{ u.full_name or u.username }} ?')">
+          <button type="submit" class="btn btn-sm btn-danger">🗑️</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- CLIENTS -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">🏢 Clients</span>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <form method="POST" action="/admin/sync-dolibarr">
+        <button type="submit" class="btn btn-green btn-sm">🔄 Sync Dolibarr</button>
+      </form>
+      <span id="sync-status" style="font-size:12px;color:var(--gray-dk);"></span>
+      <button class="btn btn-primary btn-sm" onclick="toggleSection('add-client')">➕ Ajouter</button>
+    </div>
+  </div>
+
+  <div id="add-client" style="display:none;background:var(--gray-lt);border-radius:8px;padding:16px;margin-bottom:16px;">
+    <form method="POST" action="/admin/client/add">
+      <div class="form-row">
+        <div class="form-group"><input type="text" name="name" class="form-input" placeholder="Nom client *" required></div>
+        <div class="form-group"><input type="text" name="address" class="form-input" placeholder="Adresse complète"></div>
       </div>
+      <div class="form-row">
+        <div class="form-group"><input type="text" name="contact_name" class="form-input" placeholder="Contact sur place"></div>
+        <div class="form-group"><input type="text" name="contact_phone" class="form-input" placeholder="Téléphone"></div>
+      </div>
+      <div class="form-group"><textarea name="notes_permanentes" class="form-textarea" rows="2" placeholder="Notes permanentes (câble, accès, code...)"></textarea></div>
+      <button type="submit" class="btn btn-green">✅ Ajouter</button>
+    </form>
+  </div>
 
-      <!-- Liste clients -->
-      <table class="table mt-2">
-        <thead><tr><th>Nom</th><th>Statut</th><th>Actions</th></tr></thead>
-        <tbody>
-          {% for c in clients %}
-          <tr>
-            <td>
-              <span class="client-name" onclick="toggleClientServices({{ c.id }})">
-                {{ c.name }} <small style="color:#999">▾</small>
-              </span>
-            </td>
-            <td><span class="badge {% if c.active %}badge-success{% else %}badge-warning{% endif %}">{{ 'Actif' if c.active else 'Inactif' }}</span></td>
-            <td>
-              <a href="{{ url_for('toggle_client', cid=c.id) }}" class="btn btn-xs btn-secondary">{{ '🔒' if c.active else '🔓' }}</a>
-              <a href="{{ url_for('delete_client', cid=c.id) }}" class="btn btn-xs btn-danger" onclick="return confirm('Supprimer {{ c.name }} ?')">🗑</a>
-            </td>
-          </tr>
-          <!-- Services inline pour ce client -->
-          <tr class="client-services-row hidden" id="cs-row-{{ c.id }}">
-            <td colspan="3">
-              <form method="POST" action="{{ url_for('assign_services_bulk') }}" class="services-inline-form">
-                <input type="hidden" name="client_id" value="{{ c.id }}"/>
-                <div class="services-checklist" id="cs-list-{{ c.id }}">
-                  <div class="loading-msg">Chargement...</div>
-                </div>
-                <button type="submit" class="btn btn-xs btn-success mt-2">💾 Sauvegarder</button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+  <table class="data-table">
+    <thead><tr><th>Client</th><th>Adresse</th><th>Contact</th><th>Notes</th><th>Actions</th></tr></thead>
+    <tbody>
+    {% for c in clients %}
+    <tr>
+      <td><strong>{{ c.name }}</strong></td>
+      <td>{{ c.address or '—' }}</td>
+      <td>{{ c.contact_name or '—' }}{% if c.contact_phone %}<br><small>{{ c.contact_phone }}</small>{% endif %}</td>
+      <td>{{ (c.notes_permanentes or '')[:50] }}{% if c.notes_permanentes and c.notes_permanentes|length > 50 %}...{% endif %}</td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-sm btn-steel" onclick="editClient({{ c.id }}, '{{ c.name }}', '{{ c.address or '' }}', '{{ c.contact_name or '' }}', '{{ c.contact_phone or '' }}', `{{ c.notes_permanentes or '' }}`)">✏️</button>
+        <form method="POST" action="/admin/client/toggle/{{ c.id }}" style="display:inline;">
+          <button type="submit" class="btn btn-sm btn-danger">🔴</button>
+        </form>
+        <form method="POST" action="/admin/client/delete/{{ c.id }}" style="display:inline;" onsubmit="return confirm('Supprimer {{ c.name }} ?')">
+          <button type="submit" class="btn btn-sm btn-danger">🗑️</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
 
-    <!-- Service Templates -->
-    <div class="card">
-      <h3 class="card-title">🏷️ Catalogue des prestations</h3>
-      <form method="POST" action="{{ url_for('add_template') }}" class="inline-form">
-        <input type="text" name="template_name" placeholder="Nom de la prestation" required class="form-input"/>
-        <button type="submit" class="btn btn-primary">+ Ajouter</button>
-      </form>
-      <table class="table mt-2">
-        <thead><tr><th>Prestation</th><th>Statut</th><th>Action</th></tr></thead>
-        <tbody>
-          {% for t in templates %}
-          <tr>
-            <td>{{ t.name }}</td>
-            <td><span class="badge {% if t.active %}badge-success{% else %}badge-warning{% endif %}">{{ 'Actif' if t.active else 'Inactif' }}</span></td>
-            <td>
-              <a href="{{ url_for('toggle_template', tid=t.id) }}" class="btn btn-xs btn-secondary">{{ '🔒' if t.active else '🔓' }}</a>
-              <a href="{{ url_for('delete_template', tid=t.id) }}" class="btn btn-xs btn-danger" onclick="return confirm('Supprimer {{ t.name }} ?')">🗑</a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+<!-- NOMENCLATURE MISSIONS -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">🗂️ Nomenclature des missions</span>
+    <button class="btn btn-primary btn-sm" onclick="toggleSection('add-type')">➕ Ajouter</button>
+  </div>
 
-    <!-- Manual Entry -->
-    <div class="card card-full">
-      <h3 class="card-title">✏️ Encodage manuel</h3>
-      <form method="POST" action="{{ url_for('manual_entry') }}" class="manual-form">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Collaborateur principal</label>
-            <select name="user_id" class="form-select" required>
-              {% for u in users %}
-                <option value="{{ u.id }}">{{ u.username }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Date</label>
-            <input type="date" name="date" required class="form-input"/>
-          </div>
-          <div class="form-group">
-            <label>Heure début</label>
-            <input type="time" name="start_hour" required class="form-input"/>
-          </div>
-          <div class="form-group">
-            <label>Heure fin</label>
-            <input type="time" name="end_hour" required class="form-input"/>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Client</label>
-            <select name="client_id" id="manual-client" class="form-select" required onchange="loadManualServices()">
-              <option value="">— Client —</option>
-              {% for c in clients %}
-                <option value="{{ c.id }}">{{ c.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Prestation</label>
-            <select name="template_id" id="manual-service" class="form-select" required>
-              <option value="">— Prestation —</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Justification</label>
-            <input type="text" name="justification" placeholder="Optionnel" class="form-input"/>
-          </div>
-        </div>
+  <div id="add-type" style="display:none;background:var(--gray-lt);border-radius:8px;padding:16px;margin-bottom:16px;">
+    <form method="POST" action="/admin/mission-type/add">
+      <div class="form-row">
+        <div class="form-group"><input type="text" name="code" class="form-input" placeholder="Code (ex: MON_LED_8) *" required></div>
+        <div class="form-group"><input type="text" name="label" class="form-input" placeholder="Libellé *" required></div>
+      </div>
+      <div class="form-row">
         <div class="form-group">
-          <label>Collègues (optionnel)</label>
-          <div class="chips">
-            {% for u in users %}
-              <label class="chip-check">
-                <input type="checkbox" name="colleagues" value="{{ u.id }}"/> {{ u.username }}
-              </label>
-            {% endfor %}
-          </div>
+          <input type="number" name="ref_duration_min" class="form-input" placeholder="Durée référence (min) *" required min="15" step="15">
+          <small style="color:var(--gray-dk);font-size:11px;">Ex: 240 = 4h00 | 90 = 1h30</small>
         </div>
-        <button type="submit" class="btn btn-primary">💾 Enregistrer</button>
-      </form>
-    </div>
+        <div class="form-group"><button type="submit" class="btn btn-green btn-full">✅ Ajouter</button></div>
+      </div>
+    </form>
+  </div>
 
+  <table class="data-table">
+    <thead><tr><th>Code</th><th>Libellé</th><th>Durée référence</th><th>Statut</th><th>Actions</th></tr></thead>
+    <tbody>
+    {% for t in mission_types %}
+    <tr>
+      <td><code>{{ t.code }}</code></td>
+      <td><strong>{{ t.label }}</strong></td>
+      <td>
+        {% set h = (t.ref_duration_min // 60)|int %}
+        {% set m = t.ref_duration_min % 60 %}
+        <strong>{{ h }}h{% if m %}{{ '%02d'|format(m) }}{% endif %}</strong>
+        <small style="color:var(--gray-dk);">({{ t.ref_duration_min }} min)</small>
+      </td>
+      <td>
+        {% if t.active %}<span class="badge badge-success">Actif</span>
+        {% else %}<span class="badge badge-danger">Inactif</span>{% endif %}
+      </td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-sm btn-steel" onclick="editType({{ t.id }}, '{{ t.code }}', '{{ t.label }}', {{ t.ref_duration_min }})">✏️ Modifier</button>
+        <form method="POST" action="/admin/mission-type/toggle/{{ t.id }}" style="display:inline;">
+          <button type="submit" class="btn btn-sm {{ 'btn-danger' if t.active else 'btn-green' }}">
+            {{ '🔴 Désactiver' if t.active else '🟢 Activer' }}
+          </button>
+        </form>
+        <form method="POST" action="/admin/mission-type/delete/{{ t.id }}" style="display:inline;" onsubmit="return confirm('Supprimer {{ t.label }} ?')">
+          <button type="submit" class="btn btn-sm btn-danger">🗑️</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- RESET DONNÉES TEST -->
+<div class="card" style="border-left:4px solid var(--danger);margin-top:24px;">
+  <div class="card-header">
+    <span class="card-title">🗑️ Reset données test</span>
+  </div>
+  <p style="font-size:13px;color:var(--gray-dk);margin-bottom:12px;">
+    Supprime toutes les missions, rapports, scores et logs de test.<br>
+    <strong>Garde les users, clients et nomenclature.</strong>
+  </p>
+  <form method="POST" action="/admin/reset-test" onsubmit="return confirm('Supprimer TOUTES les donnees de test ?')">
+    <button type="submit" class="btn btn-danger">🗑️ Reset toutes les données test</button>
+  </form>
+</div>
+
+<!-- MODAL EDIT USER -->
+<div class="modal-overlay" id="modal-user">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Modifier l'utilisateur</span>
+      <button class="modal-close" onclick="closeModal('modal-user')">✕</button>
+    </div>
+    <form method="POST" id="edit-user-form">
+      <div class="form-group">
+        <label class="form-label">Nom complet</label>
+        <input type="text" name="full_name" id="edit-user-name" class="form-input" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" name="email" id="edit-user-email" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Rôle</label>
+        <select name="role" id="edit-user-role" class="form-select">
+          <option value="technicien">👷 Technicien</option>
+          <option value="commercial">💼 Commercial</option>
+          <option value="responsable">🔧 Responsable technique</option>
+          <option value="manager">📊 Manager</option>
+          <option value="admin">⚙️ Admin</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nouveau mot de passe <small style="color:var(--gray-dk)">(laisser vide = inchangé)</small></label>
+        <input type="password" name="password" class="form-input" placeholder="Nouveau mot de passe">
+      </div>
+      <button type="submit" class="btn btn-green btn-full">✅ Sauvegarder</button>
+    </form>
   </div>
 </div>
 
+<!-- MODAL EDIT TYPE -->
+<div class="modal-overlay" id="modal-type">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Modifier le type de mission</span>
+      <button class="modal-close" onclick="closeModal('modal-type')">✕</button>
+    </div>
+    <form method="POST" id="edit-type-form">
+      <div class="form-group">
+        <label class="form-label">Code</label>
+        <input type="text" name="code" id="edit-type-code" class="form-input" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Libellé</label>
+        <input type="text" name="label" id="edit-type-label" class="form-input" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Durée référence (minutes)</label>
+        <input type="number" name="ref_duration_min" id="edit-type-min" class="form-input" min="15" step="15" required>
+        <small style="color:var(--gray-dk);font-size:11px;">Ex: 240 = 4h00 | 90 = 1h30 | 360 = 6h00</small>
+      </div>
+      <button type="submit" class="btn btn-green btn-full">✅ Sauvegarder</button>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL EDIT CLIENT -->
+<div class="modal-overlay" id="modal-client">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Modifier le client</span>
+      <button class="modal-close" onclick="closeModal('modal-client')">✕</button>
+    </div>
+    <form method="POST" id="edit-client-form">
+      <div class="form-group">
+        <label class="form-label">Nom client</label>
+        <input type="text" name="name" id="edit-client-name" class="form-input" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Adresse</label>
+        <input type="text" name="address" id="edit-client-address" class="form-input">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Contact</label>
+          <input type="text" name="contact_name" id="edit-client-contact" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Téléphone</label>
+          <input type="text" name="contact_phone" id="edit-client-phone" class="form-input">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes permanentes</label>
+        <textarea name="notes_permanentes" id="edit-client-notes" class="form-textarea" rows="3"></textarea>
+      </div>
+      <button type="submit" class="btn btn-green btn-full">✅ Sauvegarder</button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
 <script>
-// Charger les sessions actives
-function loadAdminSessions() {
-  fetch('/active_users')
+function toggleSection(id) {
+  const el = document.getElementById(id);
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function editUser(id, fullName, username, role, email) {
+  document.getElementById('edit-user-form').action = '/admin/user/edit/' + id;
+  document.getElementById('edit-user-name').value = fullName;
+  document.getElementById('edit-user-email').value = email;
+  document.getElementById('edit-user-role').value = role;
+  document.getElementById('modal-user').classList.add('open');
+}
+
+function editType(id, code, label, min) {
+  document.getElementById('edit-type-form').action = '/admin/mission-type/edit/' + id;
+  document.getElementById('edit-type-code').value = code;
+  document.getElementById('edit-type-label').value = label;
+  document.getElementById('edit-type-min').value = min;
+  document.getElementById('modal-type').classList.add('open');
+}
+
+function editClient(id, name, address, contact, phone, notes) {
+  document.getElementById('edit-client-form').action = '/admin/client/edit/' + id;
+  document.getElementById('edit-client-name').value = name;
+  document.getElementById('edit-client-address').value = address;
+  document.getElementById('edit-client-contact').value = contact;
+  document.getElementById('edit-client-phone').value = phone;
+  document.getElementById('edit-client-notes').value = notes;
+  document.getElementById('modal-client').classList.add('open');
+}
+
+function checkSyncStatus() {
+  fetch('/admin/sync-status')
     .then(r => r.json())
     .then(data => {
-      const container = document.getElementById('admin-sessions-list');
-      if (data.length === 0) {
-        container.innerHTML = '<p class="empty-msg">✅ Aucune session active en ce moment.</p>';
-        return;
+      const el = document.getElementById('sync-status');
+      if (!el) return;
+      if (data.running) {
+        el.textContent = '⏳ Sync en cours... ' + (data.imported + data.updated) + ' clients traites';
+        el.style.color = 'var(--orange)';
+      } else if (data.done && data.message) {
+        el.textContent = '✅ ' + data.message;
+        el.style.color = 'var(--green)';
       }
-      let html = '<table class="table"><thead><tr><th>Utilisateur</th><th>Client</th><th>Depuis</th><th>Action</th></tr></thead><tbody>';
-      data.forEach(u => {
-        const started = new Date(u.started_at);
-        html += '<tr>' +
-          '<td><strong>' + u.username + '</strong></td>' +
-          '<td>' + u.client_name + '</td>' +
-          '<td>' + started.toLocaleTimeString('fr-BE', {hour:'2-digit', minute:'2-digit'}) + ' (' + started.toLocaleDateString('fr-BE') + ')</td>' +
-          '<td>' +
-            '<form method="POST" action="/admin/clear_sessions" style="display:inline">' +
-              '<input type="hidden" name="user_id" value="' + u.user_id + '"/>' +
-              '<button type="submit" class="btn btn-xs btn-danger" onclick="return confirm(\'Terminer la session de ' + u.username + ' ?\')">🗑 Terminer</button>' +
-            '</form>' +
-          '</td>' +
-          '</tr>';
-      });
-      html += '</tbody></table>';
-      container.innerHTML = html;
-    });
-}
-document.addEventListener('DOMContentLoaded', loadAdminSessions);
-
-function toggleNewClient() {
-  const box = document.getElementById('new-client-box');
-  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    }).catch(() => {});
 }
 
-function toggleHoursNew(checkbox, templateId) {
-  const input = document.querySelector('input[name="hours_' + templateId + '"]');
-  if (input) {
-    input.disabled = !checkbox.checked;
-    if (!checkbox.checked) input.value = '';
-  }
-}
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+});
 
-function toggleClientServices(clientId) {
-  const row = document.getElementById('cs-row-' + clientId);
-  if (row.classList.contains('hidden')) {
-    row.classList.remove('hidden');
-    loadClientServicesInline(clientId);
-  } else {
-    row.classList.add('hidden');
-  }
-}
-
-// Charger les services d'un client existant — avec note facultative
-function loadClientServicesInline(clientId) {
-  const container = document.getElementById('cs-list-' + clientId);
-  fetch('/admin/get_client_assignments/' + clientId)
-    .then(r => r.json())
-    .then(data => {
-      container.innerHTML = '';
-      data.forEach(s => {
-
-        const row = document.createElement('div');
-        row.className = 'service-check-row';
-
-        // Label + checkbox
-        const label = document.createElement('label');
-        label.className = 'chip-check';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.name = 'selected_' + s.template_id;
-        checkbox.value = '1';
-        checkbox.checked = s.assigned ? true : false;
-        const labelText = document.createTextNode(' ' + s.name);
-        label.appendChild(checkbox);
-        label.appendChild(labelText);
-
-        // Input heures
-        const hoursInput = document.createElement('input');
-        hoursInput.type = 'number';
-        hoursInput.name = 'hours_' + s.template_id;
-        hoursInput.value = s.monthly_hours > 0 ? s.monthly_hours : '';
-        hoursInput.step = '0.5';
-        hoursInput.min = '0';
-        hoursInput.placeholder = 'h/mois';
-        hoursInput.className = 'form-input form-input-xs';
-
-        // Input note facultative
-        const noteInput = document.createElement('input');
-        noteInput.type = 'text';
-        noteInput.name = 'note_' + s.template_id;
-        noteInput.value = s.note || '';
-        noteInput.placeholder = '📝 Note (optionnel)';
-        noteInput.className = 'form-input form-input-xs';
-        noteInput.style.minWidth = '140px';
-
-        row.appendChild(label);
-        row.appendChild(hoursInput);
-        row.appendChild(noteInput);
-        container.appendChild(row);
-      });
-    });
-}
-
-function loadManualServices() {
-  const clientId = document.getElementById('manual-client').value;
-  if (!clientId) return;
-  fetch('/admin/get_services_for_client/' + clientId)
-    .then(r => r.json())
-    .then(data => {
-      const sel = document.getElementById('manual-service');
-      sel.innerHTML = '<option value="">— Prestation —</option>';
-      data.forEach(s => {
-        sel.innerHTML += '<option value="' + s.template_id + '">' + s.name + (s.note ? ' — ' + s.note : '') + '</option>';
-      });
-    });
-}
+checkSyncStatus();
+setInterval(checkSyncStatus, 4000);
 </script>
 {% endblock %}
