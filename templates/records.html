@@ -166,6 +166,7 @@
               <input type="date" name="date" value="{{ e.start_time[:10] }}" class="form-input form-input-sm"/>
               <input type="time" name="start_hour" value="{{ e.start_time[11:16] }}" class="form-input form-input-sm"/>
               <input type="time" name="end_hour" value="{{ e.end_time[11:16] if e.end_time else '' }}" class="form-input form-input-sm"/>
+              <input type="number" name="manual_duration" placeholder="Durée (min)" min="1" step="1" class="form-input form-input-sm" style="width:120px"/>  
               <input type="text" name="justification" value="{{ e.justification or '' }}" placeholder="Justification" class="form-input form-input-sm"/>
               <button type="submit" class="btn btn-xs btn-success">💾 Sauver</button>
             </form>

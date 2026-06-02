@@ -953,7 +953,11 @@ def edit_entry(eid):
     end_time = f"{date_str}T{end_h}:00"
     start_dt = datetime.fromisoformat(start_time)
     end_dt = datetime.fromisoformat(end_time)
-    duration = max(0, (end_dt - start_dt).total_seconds() / 60)
+    manual_duration = request.form.get('manual_duration', '').strip()  
+    if manual_duration:  
+        duration = max(0, float(manual_duration))  
+    else:  
+        duration = max(0, (end_dt - start_dt).total_seconds() / 60)  
     conn = get_db()
     c = conn.cursor()
     c.execute(f"UPDATE time_entries SET start_time={PLACEHOLDER}, end_time={PLACEHOLDER}, duration_minutes={PLACEHOLDER}, justification={PLACEHOLDER} WHERE id={PLACEHOLDER}",
