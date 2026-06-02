@@ -17,7 +17,7 @@
 
   <div id="add-user" style="display:none;background:var(--gray-lt);border-radius:8px;padding:16px;margin-bottom:16px;">
     <div style="font-weight:700;color:var(--steel);margin-bottom:12px;">➕ Nouvel utilisateur</div>
-    <form method="POST" action="/admin/user/add">
+    <form autocomplete="off" method="POST" action="/admin/user/add">
       <div class="form-row">
         <div class="form-group"><input type="text" name="full_name" class="form-input" placeholder="Nom complet *" required></div>
         <div class="form-group"><input type="text" name="username" class="form-input" placeholder="Identifiant *" required></div>
@@ -65,12 +65,12 @@
       <td style="display:flex;gap:6px;flex-wrap:wrap;">
         <button class="btn btn-sm btn-steel" onclick="editUser({{ u.id }}, '{{ u.full_name or '' }}', '{{ u.username }}', '{{ u.role }}', '{{ u.email or '' }}')">✏️ Modifier</button>
         {% if u.username != 'admin' %}
-        <form method="POST" action="/admin/user/toggle/{{ u.id }}" style="display:inline;">
+        <form autocomplete="off" method="POST" action="/admin/user/toggle/{{ u.id }}" style="display:inline;">
           <button type="submit" class="btn btn-sm {{ 'btn-danger' if u.active else 'btn-green' }}">
             {{ '🔴 Désactiver' if u.active else '🟢 Activer' }}
           </button>
         </form>
-        <form method="POST" action="/admin/user/delete/{{ u.id }}" style="display:inline;" onsubmit="return confirm('Supprimer {{ u.full_name or u.username }} ?')">
+        <form autocomplete="off" method="POST" action="/admin/user/delete/{{ u.id }}" style="display:inline;" onsubmit="return confirm('Supprimer {{ u.full_name or u.username }} ?')">
           <button type="submit" class="btn btn-sm btn-danger">🗑️</button>
         </form>
         {% endif %}
@@ -86,7 +86,7 @@
   <div class="card-header">
     <span class="card-title">🏢 Clients</span>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      <form method="POST" action="/admin/sync-dolibarr">
+      <form autocomplete="off" method="POST" action="/admin/sync-dolibarr">
         <button type="submit" class="btn btn-green btn-sm">🔄 Sync Dolibarr</button>
       </form>
       <span id="sync-status" style="font-size:12px;color:var(--gray-dk);"></span>
@@ -95,7 +95,7 @@
   </div>
 
   <div id="add-client" style="display:none;background:var(--gray-lt);border-radius:8px;padding:16px;margin-bottom:16px;">
-    <form method="POST" action="/admin/client/add">
+    <form autocomplete="off" method="POST" action="/admin/client/add">
       <div class="form-row">
         <div class="form-group"><input type="text" name="name" class="form-input" placeholder="Nom client *" required></div>
         <div class="form-group"><input type="text" name="address" class="form-input" placeholder="Adresse complète"></div>
@@ -120,10 +120,10 @@
       <td>{{ (c.notes_permanentes or '')[:50] }}{% if c.notes_permanentes and c.notes_permanentes|length > 50 %}...{% endif %}</td>
       <td style="display:flex;gap:6px;">
         <button class="btn btn-sm btn-steel" onclick="editClient({{ c.id }}, '{{ c.name }}', '{{ c.address or '' }}', '{{ c.contact_name or '' }}', '{{ c.contact_phone or '' }}', `{{ c.notes_permanentes or '' }}`)">✏️</button>
-        <form method="POST" action="/admin/client/toggle/{{ c.id }}" style="display:inline;">
+        <form autocomplete="off" method="POST" action="/admin/client/toggle/{{ c.id }}" style="display:inline;">
           <button type="submit" class="btn btn-sm btn-danger">🔴</button>
         </form>
-        <form method="POST" action="/admin/client/delete/{{ c.id }}" style="display:inline;" onsubmit="return confirm('Supprimer {{ c.name }} ?')">
+        <form autocomplete="off" method="POST" action="/admin/client/delete/{{ c.id }}" style="display:inline;" onsubmit="return confirm('Supprimer {{ c.name }} ?')">
           <button type="submit" class="btn btn-sm btn-danger">🗑️</button>
         </form>
       </td>
@@ -141,7 +141,7 @@
   </div>
 
   <div id="add-type" style="display:none;background:var(--gray-lt);border-radius:8px;padding:16px;margin-bottom:16px;">
-    <form method="POST" action="/admin/mission-type/add">
+    <form autocomplete="off" method="POST" action="/admin/mission-type/add">
       <div class="form-row">
         <div class="form-group"><input type="text" name="code" class="form-input" placeholder="Code (ex: MON_LED_8) *" required></div>
         <div class="form-group"><input type="text" name="label" class="form-input" placeholder="Libellé *" required></div>
@@ -175,12 +175,12 @@
       </td>
       <td style="display:flex;gap:6px;">
         <button class="btn btn-sm btn-steel" onclick="editType({{ t.id }}, '{{ t.code }}', '{{ t.label }}', {{ t.ref_duration_min }})">✏️ Modifier</button>
-        <form method="POST" action="/admin/mission-type/toggle/{{ t.id }}" style="display:inline;">
+        <form autocomplete="off" method="POST" action="/admin/mission-type/toggle/{{ t.id }}" style="display:inline;">
           <button type="submit" class="btn btn-sm {{ 'btn-danger' if t.active else 'btn-green' }}">
             {{ '🔴 Désactiver' if t.active else '🟢 Activer' }}
           </button>
         </form>
-        <form method="POST" action="/admin/mission-type/delete/{{ t.id }}" style="display:inline;" onsubmit="return confirm('Supprimer {{ t.label }} ?')">
+        <form autocomplete="off" method="POST" action="/admin/mission-type/delete/{{ t.id }}" style="display:inline;" onsubmit="return confirm('Supprimer {{ t.label }} ?')">
           <button type="submit" class="btn btn-sm btn-danger">🗑️</button>
         </form>
       </td>
@@ -199,7 +199,7 @@
     Supprime toutes les missions, rapports, scores et logs de test.<br>
     <strong>Garde les users, clients et nomenclature.</strong>
   </p>
-  <form method="POST" action="/admin/reset-test" onsubmit="return confirm('Supprimer TOUTES les donnees de test ?')">
+  <form autocomplete="off" method="POST" action="/admin/reset-test" onsubmit="return confirm('Supprimer TOUTES les donnees de test ?')">
     <button type="submit" class="btn btn-danger">🗑️ Reset toutes les données test</button>
   </form>
 </div>
@@ -211,7 +211,7 @@
       <span class="modal-title">✏️ Modifier l'utilisateur</span>
       <button class="modal-close" onclick="closeModal('modal-user')">✕</button>
     </div>
-    <form method="POST" id="edit-user-form">
+    <form autocomplete="off" method="POST" id="edit-user-form">
       <div class="form-group">
         <label class="form-label">Nom complet</label>
         <input type="text" name="full_name" id="edit-user-name" class="form-input" required>
@@ -246,7 +246,7 @@
       <span class="modal-title">✏️ Modifier le type de mission</span>
       <button class="modal-close" onclick="closeModal('modal-type')">✕</button>
     </div>
-    <form method="POST" id="edit-type-form">
+    <form autocomplete="off" method="POST" id="edit-type-form">
       <div class="form-group">
         <label class="form-label">Code</label>
         <input type="text" name="code" id="edit-type-code" class="form-input" required>
@@ -272,7 +272,7 @@
       <span class="modal-title">✏️ Modifier le client</span>
       <button class="modal-close" onclick="closeModal('modal-client')">✕</button>
     </div>
-    <form method="POST" id="edit-client-form">
+    <form autocomplete="off" method="POST" id="edit-client-form">
       <div class="form-group">
         <label class="form-label">Nom client</label>
         <input type="text" name="name" id="edit-client-name" class="form-input" required>
