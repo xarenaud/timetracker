@@ -528,8 +528,9 @@ def records():
         users = [dict(r) for r in users_raw]
         templates = [dict(r) for r in templates_raw]
 
-    date_from = request.args.get('date_from', '')
-    date_to = request.args.get('date_to', '')
+    today = datetime.now().strftime('%Y-%m-%d')  
+    date_from = request.args.get('date_from', today)  
+    date_to = request.args.get('date_to', today)  
     month = request.args.get('month', '')
     client_id = request.args.get('client_id', '')
     template_id = request.args.get('template_id', '')

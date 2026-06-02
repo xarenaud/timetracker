@@ -526,14 +526,16 @@ function loadServices(saveChoice, restoreServiceId) {
       modeGroup.style.display = 'block';
       switchMode(currentMode);
       document.getElementById('start-btn').disabled = true;
-
-      // Restaurer le service mémorisé si demandé
-      if (restoreServiceId) {
-        sel.value = restoreServiceId;
-        if (sel.value === restoreServiceId) {
-          checkReady();
-        }
-      }
+      // Restaurer le service memorise  
+      if (restoreServiceId) {  
+        const exists = Array.from(sel.options).some(o => o.value == restoreServiceId);  
+        if (exists) {  
+          sel.value = restoreServiceId;  
+        } else {  
+          sel.value = '';  
+        }  
+        checkReady();  
+      }  
     });
 }
 
