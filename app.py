@@ -787,14 +787,15 @@ def search_dolibarr():
         return jsonify([])  
     DOLIBARR_URL = os.environ.get('DOLIBARR_URL', 'https://client.cx-com.be')  
     DOLIBARR_KEY = os.environ.get('DOLIBARR_KEY', '')  
-    try:  
-        import urllib.request, json as _json  
+  try:  
+        import requests as req_lib  
         url = f"{DOLIBARR_URL}/api/index.php/thirdparties?sortfield=t.nom&sortorder=ASC&limit=10&sqlfilters=(t.nom:like:%25{q}%25)"  
-        req = urllib.request.Request(url, headers={'DOLAPIKEY': DOLIBARR_KEY})  
-        with urllib.request.urlopen(req, timeout=5) as resp:  
-            data = _json.loads(resp.read().decode())  
-        results = [{'id': r['id'], 'name': r['nom']} for r in data if 'nom' in r]  
+        resp = req_lib.get(url, headers={'DOLAPIKEY': DOLIBARR_KEY}, timeout=5)  
+        data = resp.json()  
+        results = [{'id': r['id'], 'name': r['name']} for r in data if 'name' in r]  
         return jsonify(results)  
+    except Exception as e:  
+        return jsonify({'error': str(e)}), 500  
     except Exception as e:  
         return jsonify([])
 
