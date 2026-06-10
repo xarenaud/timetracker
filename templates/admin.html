@@ -132,6 +132,76 @@
     </tbody>
   </table>
 </div>
+<!-- PRESTATIONS PAR CLIENT -->  
+<div class="card">  
+  <div class="card-header">  
+    <span class="card-title">⏱️ Prestations par client</span>  
+  </div>
+
+  <!-- Formulaire ajout -->  
+  <div style="background:var(--gray-lt);border-radius:8px;padding:16px;margin-bottom:16px;">  
+    <form autocomplete="off" method="POST" action="/admin/add_service">  
+      <div class="form-row">  
+        <div class="form-group">  
+          <label class="form-label">Client</label>  
+          <select name="client_id" class="form-select" required>  
+            <option value="">— Choisir —</option>  
+            {% for c in clients %}  
+            <option value="{{ c.id }}">{{ c.name }}</option>  
+            {% endfor %}  
+          </select>  
+        </div>  
+        <div class="form-group">  
+          <label class="form-label">Type de mission</label>  
+          <select name="template_id" class="form-select" required>  
+            <option value="">— Choisir —</option>  
+            {% for t in mission_types %}  
+            <option value="{{ t.id }}">{{ t.label }}</option>  
+            {% endfor %}  
+          </select>  
+        </div>  
+        <div class="form-group">  
+          <label class="form-label">Heures/mois</label>  
+          <input type="number" name="monthly_hours" class="form-input" placeholder="ex: 8" min="0" step="0.5" required>  
+        </div>  
+        <div class="form-group" style="display:flex;align-items:flex-end;">  
+          <button type="submit" class="btn btn-green">✅ Ajouter</button>  
+        </div>  
+      </div>  
+    </form>  
+  </div>
+
+  <!-- Liste des prestations -->  
+  <table class="data-table">  
+    <thead>  
+      <tr>  
+        <th>Client</th>  
+        <th>Type de mission</th>  
+        <th>Heures/mois</th>  
+        <th>Actions</th>  
+      </tr>  
+    </thead>  
+    <tbody>  
+    {% for cs in client_services %}  
+    <tr>  
+      <td><strong>{{ cs.client_name }}</strong></td>  
+      <td>{{ cs.service_name }}</td>  
+      <td>  
+        <form autocomplete="off" method="POST" action="/admin/edit_service/{{ cs.id }}" style="display:flex;gap:6px;align-items:center;">  
+          <input type="number" name="monthly_hours" value="{{ cs.monthly_hours }}" class="form-input form-input-sm" style="width:80px;" min="0" step="0.5">  
+          <button type="submit" class="btn btn-xs btn-success">💾</button>  
+        </form>  
+      </td>  
+      <td>  
+        <form autocomplete="off" method="POST" action="/admin/delete_service/{{ cs.id }}" style="display:inline;" onsubmit="return confirm('Supprimer cette prestation ?')">  
+          <button type="submit" class="btn btn-sm btn-danger">🗑️</button>  
+        </form>  
+      </td>  
+    </tr>  
+    {% endfor %}  
+    </tbody>  
+  </table>  
+</div>  
 
 <!-- NOMENCLATURE MISSIONS -->
 <div class="card">
