@@ -646,6 +646,34 @@ def records():
 
 # ── ADMIN ─────────────────────────────────────────────────────────────────────
 
+@app.route('/admin/clients')  
+@admin_required  
+def admin_clients():  
+    conn = get_db()  
+    c = conn.cursor()  
+    c.execute("SELECT id, name, active, collab_start, collab_end, dolibarr_name, address, contact_name, contact_phone, notes_permanentes, dolibarr_quote_url FROM clients ORDER BY name")  
+    clients_raw = c.fetchall()  
+    c.execute("SELECT id, name, active FROM service_templates ORDER BY name")  
+    templates_raw = c.fetchall()  
+    c.execute("""  
+        SELECT cs.id, cs.client_id, cs.template_id, cs.monthly_hours, c.name as client_name, st.name as service_name  
+        FROM client_services cs  
+        JOIN clients c ON cs.client_id = c.id  
+        JOIN service_templates st ON cs.template_id = st.id  
+        ORDER BY c.name, st.name  
+    """)  
+    cs_raw = c.fetchall()  
+    conn.close()  
+    if USE_PG:  
+        clients = [{'id': r[0], 'name': r[1], 'active': r[2], 'collab_start': r[3], 'collab_end': r[4], 'dolibarr_name': r[5], 'address': r[6], 'contact_name': r[7], 'contact_phone': r[8], 'notes_permanentes': r[9], 'dolibarr_quote_url': r[10]} for r in clients_raw]  
+        templates = [{'id': r[0], 'name': r[1], 'active': r[2]} for r in templates_raw]  
+        client_services = [{'id': r[0], 'client_id': r[1], 'template_id': r[2], 'monthly_hours': r[3], 'client_name': r[4], 'service_name': r[5]} for r in cs_raw]  
+    else:  
+        clients = [dict(r) for r in clients_raw]  
+        templates = [dict(r) for r in templates_raw]  
+        client_services = [dict(r) for r in cs_raw]  
+    return render_template('admin_clients.html', clients=clients, templates=templates, client_services=client_services)
+
 @app.route('/admin')
 @admin_required
 def admin():
