@@ -645,7 +645,7 @@ def admin():
     c.execute("SELECT id, username, role, active FROM users ORDER BY username")
     users_raw = c.fetchall()
     c.execute("SELECT id, name, active, collab_start, collab_end, dolibarr_name, address, contact_name, contact_phone, notes_permanentes FROM clients ORDER BY name")  
-    templates_raw = c.fetchall()
+    clients_raw = c.fetchall()  
     c.execute("""
         SELECT cs.id, cs.client_id, cs.template_id, cs.monthly_hours, c.name as client_name, st.name as service_name  
         FROM client_services cs  
