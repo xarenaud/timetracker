@@ -787,7 +787,7 @@ def search_dolibarr():
         return jsonify([])  
     DOLIBARR_URL = os.environ.get('DOLIBARR_URL', 'https://client.cx-com.be')  
     DOLIBARR_KEY = os.environ.get('DOLIBARR_KEY', '')  
-  try:  
+    try:  
         import requests as req_lib  
         url = f"{DOLIBARR_URL}/api/index.php/thirdparties?sortfield=t.nom&sortorder=ASC&limit=10&sqlfilters=(t.nom:like:%25{q}%25)"  
         resp = req_lib.get(url, headers={'DOLAPIKEY': DOLIBARR_KEY}, timeout=5)  
@@ -796,8 +796,6 @@ def search_dolibarr():
         return jsonify(results)  
     except Exception as e:  
         return jsonify({'error': str(e)}), 500  
-    except Exception as e:  
-        return jsonify([])
 
 @app.route('/admin/client/edit/<int:cid>', methods=['POST'])  
 @admin_required  
