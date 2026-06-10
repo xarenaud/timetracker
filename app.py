@@ -630,11 +630,11 @@ def admin():
     c.execute("SELECT id, name, active FROM service_templates ORDER BY name")
     templates_raw = c.fetchall()
     c.execute("""
-        SELECT cs.id, cs.monthly_hours, c.name as client_name, st.name as service_name
-        FROM client_services cs
-        JOIN clients c ON cs.client_id = c.id
-        JOIN service_templates st ON cs.template_id = st.id
-        ORDER BY c.name, st.name
+        SELECT cs.id, cs.client_id, cs.template_id, cs.monthly_hours, c.name as client_name, st.name as service_name  
+        FROM client_services cs  
+        JOIN clients c ON cs.client_id = c.id  
+        JOIN service_templates st ON cs.template_id = st.id  
+        ORDER BY c.name, st.name  
     """)
     cs_raw = c.fetchall()
     conn.close()
@@ -643,7 +643,7 @@ def admin():
         users = [{'id': r[0], 'username': r[1], 'role': r[2], 'active': r[3]} for r in users_raw]
         clients = [{'id': r[0], 'name': r[1], 'active': r[2], 'collab_start': r[3], 'collab_end': r[4]} for r in clients_raw]
         templates = [{'id': r[0], 'name': r[1], 'active': r[2]} for r in templates_raw]
-        client_services = [{'id': r[0], 'monthly_hours': r[1], 'client_name': r[2], 'service_name': r[3]} for r in cs_raw]
+        client_services = [{'id': r[0], 'client_id': r[1], 'template_id': r[2], 'monthly_hours': r[3], 'client_name': r[4], 'service_name': r[5]} for r in cs_raw]  
     else:
         users = [dict(r) for r in users_raw]
         clients = [dict(r) for r in clients_raw]
