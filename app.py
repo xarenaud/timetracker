@@ -646,8 +646,10 @@ def admin():
     users_raw = c.fetchall()
     c.execute("SELECT id, name, active, collab_start, collab_end, dolibarr_name, address, contact_name, contact_phone, notes_permanentes FROM clients ORDER BY name")  
     clients_raw = c.fetchall()  
-    c.execute("""
-        SELECT cs.id, cs.client_id, cs.template_id, cs.monthly_hours, c.name as client_name, st.name as service_name  
+    c.execute("SELECT id, name, active FROM service_templates ORDER BY name")  
+    templates_raw = c.fetchall()  
+    c.execute("""  
+        SELECT cs.id, cs.client_id, cs.template_id, cs.monthly_hours, c.name as client_name, st.name as service_name    
         FROM client_services cs  
         JOIN clients c ON cs.client_id = c.id  
         JOIN service_templates st ON cs.template_id = st.id  
