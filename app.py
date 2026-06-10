@@ -252,7 +252,13 @@ def migrate_db():
         if USE_PG:
             c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS collab_start TEXT DEFAULT NULL")
             c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS collab_end TEXT DEFAULT NULL")
-            c.execute("ALTER TABLE client_services ADD COLUMN IF NOT EXISTS note TEXT DEFAULT NULL")
+            c.execute("ALTER TABLE client_services ADD COLUMN IF NOT EXISTS note TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE client_services ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS dolibarr_name TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS address TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS contact_name TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS contact_phone TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS notes_permanentes TEXT DEFAULT NULL")  
         else:
             try:
                 c.execute("ALTER TABLE clients ADD COLUMN collab_start TEXT DEFAULT NULL")
@@ -260,9 +266,15 @@ def migrate_db():
             try:
                 c.execute("ALTER TABLE clients ADD COLUMN collab_end TEXT DEFAULT NULL")
             except: pass
-            try:
-                c.execute("ALTER TABLE client_services ADD COLUMN note TEXT DEFAULT NULL")
-            except: pass
+            try:  
+                c.execute("ALTER TABLE client_services ADD COLUMN note TEXT DEFAULT NULL")  
+            except: pass  
+            try:  
+                c.execute("ALTER TABLE client_services ADD COLUMN updated_at TEXT DEFAULT NULL")  
+            except: pass  
+            try:  
+                c.execute("ALTER TABLE clients ADD COLUMN dolibarr_name TEXT DEFAULT NULL")  
+            except: pass  
         conn.commit()
         print("[MIGRATE] Colonnes collab_start / collab_end / note OK")
     except Exception as e:
@@ -907,11 +919,12 @@ def add_service():
 
 @app.route('/admin/edit_service/<int:csid>', methods=['POST'])
 @admin_required
-def edit_service(csid):
-    monthly_hours = float(request.form.get('monthly_hours', 0))
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(f"UPDATE client_services SET monthly_hours={PLACEHOLDER} WHERE id={PLACEHOLDER}", (monthly_hours, csid))
+def edit_service(csid):  
+    monthly_hours = float(request.form.get('monthly_hours', 0))  
+    updated_at = datetime.now().strftime('%Y-%m-%d %H:%M')  
+    conn = get_db()  
+    c = conn.cursor()  
+    c.execute(f"UPDATE client_services SET monthly_hours={PLACEHOLDER}, updated_at={PLACEHOLDER} WHERE id={PLACEHOLDER}", (monthly_hours, updated_at, csid))
     conn.commit()
     conn.close()
     return redirect(url_for('admin'))
