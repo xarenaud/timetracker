@@ -250,8 +250,15 @@ def migrate_db():
     c = conn.cursor()
     try:
         if USE_PG:
-            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS collab_start TEXT DEFAULT NULL")
-            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS collab_end TEXT DEFAULT NULL")
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS collab_start TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS collab_end TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE client_services ADD COLUMN IF NOT EXISTS note TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE client_services ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS dolibarr_name TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS address TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS contact_name TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS contact_phone TEXT DEFAULT NULL")  
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS notes_permanentes TEXT DEFAULT NULL")  
             c.execute("ALTER TABLE client_services ADD COLUMN IF NOT EXISTS note TEXT DEFAULT NULL")  
             c.execute("ALTER TABLE client_services ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT NULL")  
             c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS dolibarr_name TEXT DEFAULT NULL")  
