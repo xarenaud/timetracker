@@ -1,4 +1,7 @@
-from flask import request, send_file
+def get_dashboard_data(month):  
+    if not month:  
+        month = datetime.now().strftime('%Y-%m')  
+    year_int, month_int = int(month.split('-')[0]), int(month.split('-')[1])  from flask import request, send_file
 from datetime import datetime
 import io
 
