@@ -778,7 +778,26 @@ def edit_client_dates(cid):
     conn.commit()
     conn.close()
     return redirect(url_for('admin'))
-    
+
+@app.route('/admin/search-dolibarr')  
+@admin_required  
+def search_dolibarr():  
+    q = request.args.get('q', '').strip()  
+    if len(q) < 2:  
+        return jsonify([])  
+    DOLIBARR_URL = os.environ.get('DOLIBARR_URL', 'https://client.cx-com.be')  
+    DOLIBARR_KEY = os.environ.get('DOLIBARR_KEY', '')  
+    try:  
+        import urllib.request, json as _json  
+        url = f"{DOLIBARR_URL}/api/index.php/thirdparties?sortfield=t.nom&sortorder=ASC&limit=10&sqlfilters=(t.nom:like:%25{q}%25)"  
+        req = urllib.request.Request(url, headers={'DOLAPIKEY': DOLIBARR_KEY})  
+        with urllib.request.urlopen(req, timeout=5) as resp:  
+            data = _json.loads(resp.read().decode())  
+        results = [{'id': r['id'], 'name': r['nom']} for r in data if 'nom' in r]  
+        return jsonify(results)  
+    except Exception as e:  
+        return jsonify([])
+
 @app.route('/admin/client/edit/<int:cid>', methods=['POST'])  
 @admin_required  
 def edit_client(cid):  
