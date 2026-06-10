@@ -361,7 +361,10 @@
         </div>  
         <div class="form-group" style="margin-bottom:0;">  
           <label class="form-label">Nom officiel Dolibarr <small style="color:var(--gray-dk);font-weight:400;">(référence DB officielle)</small></label>  
-          <input type="text" name="dolibarr_name" id="edit-client-dolibarr" class="form-input" placeholder="Nom tel qu'il apparaît dans Dolibarr">  
+          <input type="text" name="dolibarr_name" id="edit-client-dolibarr" class="form-input"   
+       placeholder="Tapez 2 lettres pour chercher dans Dolibarr..."   
+       autocomplete="off" oninput="searchDolibarr(this.value)">  
+<div id="dolibarr-suggestions" style="position:absolute;z-index:999;background:#fff;border:1px solid var(--gray-lt2,#e2e8f0);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.1);max-width:400px;display:none;"></div>  
         </div>  
       </div>  
       <div class="form-group">  
@@ -524,7 +527,41 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
     if (e.target === this) this.classList.remove('open');  
   });  
 });
+// ── Autocomplete Dolibarr ──────────────────────────────────────────────────  
+let dolibarrTimer = null;  
+function searchDolibarr(val) {  
+  const box = document.getElementById('dolibarr-suggestions');  
+  if (val.length < 2) { box.style.display = 'none'; return; }  
+  clearTimeout(dolibarrTimer);  
+  dolibarrTimer = setTimeout(() => {  
+    fetch('/admin/search-dolibarr?q=' + encodeURIComponent(val))  
+      .then(r => r.json())  
+      .then(data => {  
+        if (!data.length) { box.style.display = 'none'; return; }  
+        box.innerHTML = data.map(d =>  
+          `<div onclick="selectDolibarr('${d.name.replace(/'/g,"\\'")}') "  
+                style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--gray-lt,#f1f5f9);"  
+                onmouseover="this.style.background='#f8fafc'"   
+                onmouseout="this.style.background='#fff'">  
+            ${d.name}  
+          </div>`  
+        ).join('');  
+        box.style.display = 'block';  
+      }).catch(() => { box.style.display = 'none'; });  
+  }, 300);  
+}
 
+function selectDolibarr(name) {  
+  document.getElementById('edit-client-dolibarr').value = name;  
+  document.getElementById('dolibarr-suggestions').style.display = 'none';  
+}
+
+document.addEventListener('click', function(e) {  
+  if (!e.target.closest('#edit-client-dolibarr') && !e.target.closest('#dolibarr-suggestions')) {  
+    const box = document.getElementById('dolibarr-suggestions');  
+    if (box) box.style.display = 'none';  
+  }  
+});  
 checkSyncStatus();  
 setInterval(checkSyncStatus, 4000);  
 </script>  
