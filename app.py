@@ -646,7 +646,7 @@ def admin():
     users_raw = c.fetchall()
     c.execute("SELECT id, name, active, collab_start, collab_end FROM clients ORDER BY name")
     clients_raw = c.fetchall()
-    c.execute("SELECT id, name, active FROM service_templates ORDER BY name")
+    c.execute("SELECT id, name, active, collab_start, collab_end, dolibarr_name, address, contact_name, contact_phone, notes_permanentes FROM clients ORDER BY name")  
     templates_raw = c.fetchall()
     c.execute("""
         SELECT cs.id, cs.client_id, cs.template_id, cs.monthly_hours, c.name as client_name, st.name as service_name  
@@ -660,7 +660,7 @@ def admin():
 
     if USE_PG:
         users = [{'id': r[0], 'username': r[1], 'role': r[2], 'active': r[3]} for r in users_raw]
-        clients = [{'id': r[0], 'name': r[1], 'active': r[2], 'collab_start': r[3], 'collab_end': r[4]} for r in clients_raw]
+        clients = [{'id': r[0], 'name': r[1], 'active': r[2], 'collab_start': r[3], 'collab_end': r[4], 'dolibarr_name': r[5], 'address': r[6], 'contact_name': r[7], 'contact_phone': r[8], 'notes_permanentes': r[9]} for r in clients_raw]  
         templates = [{'id': r[0], 'name': r[1], 'active': r[2]} for r in templates_raw]
         client_services = [{'id': r[0], 'client_id': r[1], 'template_id': r[2], 'monthly_hours': r[3], 'client_name': r[4], 'service_name': r[5]} for r in cs_raw]  
     else:
@@ -777,6 +777,28 @@ def edit_client_dates(cid):
               (collab_start, collab_end, cid))
     conn.commit()
     conn.close()
+    return redirect(url_for('admin'))
+    
+@app.route('/admin/client/edit/<int:cid>', methods=['POST'])  
+@admin_required  
+def edit_client(cid):  
+    name              = request.form.get('name', '').strip()  
+    dolibarr_name     = request.form.get('dolibarr_name', '').strip() or None  
+    address           = request.form.get('address', '').strip() or None  
+    contact_name      = request.form.get('contact_name', '').strip() or None  
+    contact_phone     = request.form.get('contact_phone', '').strip() or None  
+    notes_permanentes = request.form.get('notes_permanentes', '').strip() or None  
+    conn = get_db()  
+    c = conn.cursor()  
+    c.execute(  
+        f"UPDATE clients SET name={PLACEHOLDER}, dolibarr_name={PLACEHOLDER}, "  
+        f"address={PLACEHOLDER}, contact_name={PLACEHOLDER}, "  
+        f"contact_phone={PLACEHOLDER}, notes_permanentes={PLACEHOLDER} "  
+        f"WHERE id={PLACEHOLDER}",  
+        (name, dolibarr_name, address, contact_name, contact_phone, notes_permanentes, cid)  
+    )  
+    conn.commit()  
+    conn.close()  
     return redirect(url_for('admin'))
 
 @app.route('/admin/add_template', methods=['POST'])
