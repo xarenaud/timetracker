@@ -1,7 +1,16 @@
-def get_dashboard_data(month):  
-    if not month:  
-        month = datetime.now().strftime('%Y-%m')  
-    year_int, month_int = int(month.split('-')[0]), int(month.split('-')[1])  from flask import request, send_file
+from flask import request, send_file  
+from datetime import datetime  
+import io
+
+def register_export_routes(app, get_db, USE_PG, PLACEHOLDER, P, get_working_days):
+
+    TARIF = 75.0  
+    BORDEAUX_HEX = '7B1C2E'
+
+    def get_dashboard_data(month):  
+        if not month:  
+            month = datetime.now().strftime('%Y-%m')  
+        year_int, month_int = int(month.split('-')[0]), int(month.split('-')[1])  
 from datetime import datetime
 import io
 
