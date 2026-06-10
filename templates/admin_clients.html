@@ -1,0 +1,326 @@
+{% extends 'base.html' %}
+
+{% block title %}Clients{% endblock %}
+
+{% block content %}  
+<div class="page-header">  
+  <h1 class="page-title">🏢 Gestion Clients</h1>  
+  <p class="page-subtitle">Clients, missions et plans de prestations</p>  
+</div>
+
+<!-- CLIENTS -->  
+<div class="card">  
+  <div class="card-header">  
+    <span class="card-title">🏢 Clients</span>  
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">  
+      <form autocomplete="off" method="POST" action="/admin/sync-dolibarr">  
+        <button type="submit" class="btn btn-green btn-sm">🔄 Sync Dolibarr</button>  
+      </form>  
+      <span id="sync-status" style="font-size:12px;color:var(--gray-dk);"></span>  
+      <button class="btn btn-primary btn-sm" onclick="toggleSection('add-client')">➕ Ajouter</button>  
+    </div>  
+  </div>
+
+  <div id="add-client" style="display:none;background:var(--gray-lt);border-radius:8px;padding:16px;margin-bottom:16px;">  
+    <form autocomplete="off" method="POST" action="/admin/client/add">  
+      <div class="form-row">  
+        <div class="form-group"><input type="text" name="name" class="form-input" placeholder="Nom client *" required></div>  
+        <div class="form-group"><input type="text" name="address" class="form-input" placeholder="Adresse complète"></div>  
+      </div>  
+      <div class="form-row">  
+        <div class="form-group"><input type="text" name="contact_name" class="form-input" placeholder="Contact sur place"></div>  
+        <div class="form-group"><input type="text" name="contact_phone" class="form-input" placeholder="Téléphone"></div>  
+      </div>  
+      <div class="form-group"><textarea name="notes_permanentes" class="form-textarea" rows="2" placeholder="Notes permanentes"></textarea></div>  
+      <button type="submit" class="btn btn-green">✅ Ajouter</button>  
+    </form>  
+  </div>
+
+  <table class="data-table">  
+    <thead><tr><th>Client</th><th>Adresse</th><th>Contact</th><th>Statut</th><th>Actions</th></tr></thead>  
+    <tbody>  
+    {% for c in clients %}  
+    <tr>  
+      <td>  
+        <strong>{{ c.name }}</strong>  
+        {% if c.dolibarr_name %}  
+<small style="color:var(--gray-dk);">{{ c.dolibarr_name }}</small>{% endif %}  
+      </td>  
+      <td>{{ c.address or '—' }}</td>  
+      <td>{{ c.contact_name or '—' }}{% if c.contact_phone %}  
+<small>{{ c.contact_phone }}</small>{% endif %}</td>  
+      <td>  
+        {% if c.active %}<span class="badge badge-success">Actif</span>  
+        {% else %}<span class="badge badge-danger">Inactif</span>{% endif %}  
+      </td>  
+      <td style="display:flex;gap:6px;">  
+        <button class="btn btn-sm btn-steel" onclick="openClientCard({{ c.id }})">📋 Fiche</button>  
+        <form autocomplete="off" method="POST" action="/admin/client/toggle/{{ c.id }}" style="display:inline;">  
+          <button type="submit" class="btn btn-sm {{ 'btn-danger' if c.active else 'btn-green' }}">  
+            {{ '🔴' if c.active else '🟢' }}  
+          </button>  
+        </form>  
+        <form autocomplete="off" method="POST" action="/admin/client/delete/{{ c.id }}" style="display:inline;" onsubmit="return confirm('Supprimer {{ c.name }} ?')">  
+          <button type="submit" class="btn btn-sm btn-danger">🗑️</button>  
+        </form>  
+      </td>  
+    </tr>  
+    {% endfor %}  
+    </tbody>  
+  </table>  
+</div>
+
+<!-- FICHE CLIENT -->  
+<div class="card" id="client-card-zone" style="display:none;">  
+  <div class="card-header">  
+    <span class="card-title" id="card-client-name">—</span>  
+    <div style="display:flex;gap:8px;">  
+      <a id="card-quote-link" href="#" target="_blank" style="display:none;" class="btn btn-sm btn-primary">📄 Voir le devis</a>  
+      <button class="btn btn-sm btn-steel" onclick="openEditClientModal()">✏️ Modifier</button>  
+      <button class="btn btn-sm" onclick="document.getElementById('client-card-zone').style.display='none'">✕ Fermer</button>  
+    </div>  
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px;">  
+    <div style="background:var(--gray-lt);border-radius:8px;padding:12px;">  
+      <div style="font-size:11px;color:var(--gray-dk);text-transform:uppercase;margin-bottom:4px;">🏷️ Nom Dolibarr</div>  
+      <div id="card-dolibarr-name" style="font-size:13px;font-weight:600;">—</div>  
+    </div>  
+    <div style="background:var(--gray-lt);border-radius:8px;padding:12px;">  
+      <div style="font-size:11px;color:var(--gray-dk);text-transform:uppercase;margin-bottom:4px;">📍 Adresse</div>  
+      <div id="card-address" style="font-size:13px;font-weight:500;">—</div>  
+    </div>  
+    <div style="background:var(--gray-lt);border-radius:8px;padding:12px;">  
+      <div style="font-size:11px;color:var(--gray-dk);text-transform:uppercase;margin-bottom:4px;">👤 Contact</div>  
+      <div id="card-contact" style="font-size:13px;font-weight:500;">—</div>  
+      <div id="card-phone" style="font-size:12px;color:var(--gray-dk);"></div>  
+    </div>  
+    <div style="background:var(--gray-lt);border-radius:8px;padding:12px;">  
+      <div style="font-size:11px;color:var(--gray-dk);text-transform:uppercase;margin-bottom:4px;">📝 Notes</div>  
+      <div id="card-notes" style="font-size:13px;white-space:pre-line;">—</div>  
+    </div>  
+  </div>
+
+  <!-- Missions -->  
+  <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📋 Missions assignées</div>  
+  <div id="card-services-list"></div>
+
+  <!-- Ajouter mission -->  
+  <div style="background:var(--gray-lt);border-radius:8px;padding:14px;margin-top:12px;">  
+    <div style="font-weight:600;font-size:13px;margin-bottom:10px;">➕ Ajouter une mission</div>  
+    <form autocomplete="off" method="POST" action="/admin/add_service" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">  
+      <input type="hidden" name="client_id" id="card-add-client-id" value="">  
+      <div class="form-group" style="flex:2;min-width:160px;">  
+        <select name="template_id" class="form-select" required>  
+          <option value="">— Type de mission —</option>  
+          {% for t in templates %}  
+          <option value="{{ t.id }}">{{ t.name }}</option>  
+          {% endfor %}  
+        </select>  
+      </div>  
+      <div class="form-group" style="flex:1;min-width:100px;">  
+        <input type="number" name="monthly_hours" class="form-input" placeholder="H/mois" min="0" step="0.5" required>  
+      </div>  
+      <button type="submit" class="btn btn-green">➕ Ajouter</button>  
+    </form>  
+  </div>  
+</div>
+
+<!-- MODAL EDIT CLIENT -->  
+<div class="modal-overlay" id="modal-client">  
+  <div class="modal">  
+    <div class="modal-header">  
+      <span class="modal-title">✏️ Modifier le client</span>  
+      <button class="modal-close" onclick="closeModal('modal-client')">✕</button>  
+    </div>  
+    <form autocomplete="off" method="POST" id="edit-client-form">  
+      <div style="background:var(--gray-lt);border-radius:8px;padding:12px;margin-bottom:16px;">  
+        <div style="font-size:11px;color:var(--gray-dk);text-transform:uppercase;margin-bottom:8px;">🏷️ Identité</div>  
+        <div class="form-group">  
+          <label class="form-label">Pseudo client <small style="color:var(--gray-dk);font-weight:400;">(nom interne)</small></label>  
+          <input type="text" name="name" id="edit-client-name" class="form-input" required>  
+        </div>  
+        <div class="form-group" style="margin-bottom:0;">  
+          <label class="form-label">Nom officiel Dolibarr</label>  
+          <div style="position:relative;">  
+            <input type="text" name="dolibarr_name" id="edit-client-dolibarr" class="form-input"  
+                   placeholder="Tapez 2 lettres pour chercher..." autocomplete="off" oninput="searchDolibarr(this.value)">  
+            <div id="dolibarr-suggestions" style="position:absolute;z-index:999;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.1);width:100%;display:none;"></div>  
+          </div>  
+        </div>  
+      </div>  
+      <div class="form-group">  
+        <label class="form-label">Adresse</label>  
+        <input type="text" name="address" id="edit-client-address" class="form-input">  
+      </div>  
+      <div class="form-row">  
+        <div class="form-group">  
+          <label class="form-label">Contact</label>  
+          <input type="text" name="contact_name" id="edit-client-contact" class="form-input">  
+        </div>  
+        <div class="form-group">  
+          <label class="form-label">Téléphone</label>  
+          <input type="text" name="contact_phone" id="edit-client-phone" class="form-input">  
+        </div>  
+      </div>  
+      <div class="form-group">  
+        <label class="form-label">Notes permanentes</label>  
+        <textarea name="notes_permanentes" id="edit-client-notes" class="form-textarea" rows="3"></textarea>  
+      </div>  
+      <div class="form-group">  
+        <label class="form-label">📄 Lien devis Dolibarr</label>  
+        <input type="text" name="dolibarr_quote_url" id="edit-client-quote-url" class="form-input" placeholder="https://client.cx-com.be/...">  
+      </div>  
+      <button type="submit" class="btn btn-green btn-full">✅ Sauvegarder</button>  
+    </form>  
+  </div>  
+</div>
+
+{% endblock %}
+
+{% block scripts %}  
+<script>  
+const CLIENTS_DATA = {  
+  {% for c in clients %}  
+  {{ c.id }}: {  
+    id: {{ c.id }},  
+    name: {{ c.name | tojson }},  
+    dolibarr_name: {{ (c.dolibarr_name or '') | tojson }},  
+    address: {{ (c.address or '') | tojson }},  
+    contact_name: {{ (c.contact_name or '') | tojson }},  
+    contact_phone: {{ (c.contact_phone or '') | tojson }},  
+    notes_permanentes: {{ (c.notes_permanentes or '') | tojson }},  
+    dolibarr_quote_url: {{ (c.dolibarr_quote_url or '') | tojson }}  
+  }{% if not loop.last %},{% endif %}  
+  {% endfor %}  
+};
+
+const CLIENT_SERVICES_DATA = {  
+  {% for c in clients %}  
+  {{ c.id }}: [  
+    {% set c_services = client_services | selectattr('client_id', 'equalto', c.id) | list %}  
+    {% for cs in c_services %}  
+    { id: {{ cs.id }}, service_name: {{ cs.service_name | tojson }}, monthly_hours: {{ cs.monthly_hours }} }{% if not loop.last %},{% endif %}  
+    {% endfor %}  
+  ]{% if not loop.last %},{% endif %}  
+  {% endfor %}  
+};
+
+function openClientCard(clientId) {  
+  const c = CLIENTS_DATA[clientId];  
+  if (!c) return;  
+  document.getElementById('card-client-name').textContent = c.name;  
+  document.getElementById('card-dolibarr-name').textContent = c.dolibarr_name || '(non renseigné)';  
+  document.getElementById('card-address').textContent = c.address || '—';  
+  document.getElementById('card-contact').textContent = c.contact_name || '—';  
+  document.getElementById('card-phone').textContent = c.contact_phone || '';  
+  document.getElementById('card-notes').textContent = c.notes_permanentes || '—';  
+  document.getElementById('card-add-client-id').value = clientId;  
+  const quoteLink = document.getElementById('card-quote-link');  
+  if (c.dolibarr_quote_url) { quoteLink.href = c.dolibarr_quote_url; quoteLink.style.display = 'inline-block'; }  
+  else { quoteLink.style.display = 'none'; }  
+  const services = CLIENT_SERVICES_DATA[clientId] || [];  
+  const listEl = document.getElementById('card-services-list');  
+  if (!services.length) {  
+    listEl.innerHTML = '<div style="color:var(--gray-dk);font-size:13px;padding:8px 0;">Aucune mission assignée.</div>';  
+  } else {  
+    let html = '<table class="data-table"><thead><tr><th>Mission</th><th>H/mois</th><th>Actions</th></tr></thead><tbody>';  
+    services.forEach(cs => {  
+      html += `<tr>  
+        <td>${cs.service_name}</td>  
+        <td><form method="POST" action="/admin/edit_service/${cs.id}" style="display:flex;gap:6px;align-items:center;">  
+          <input type="number" name="monthly_hours" value="${cs.monthly_hours}" class="form-input form-input-sm" style="width:80px;" min="0" step="0.5">  
+          <button type="submit" class="btn btn-xs btn-success">💾</button></form></td>  
+        <td><form method="POST" action="/admin/delete_service/${cs.id}" onsubmit="return confirm('Supprimer ?')">  
+          <button type="submit" class="btn btn-xs btn-danger">🗑️</button></form></td>  
+      </tr>`;  
+    });  
+    html += '</tbody></table>';  
+    listEl.innerHTML = html;  
+  }  
+  const zone = document.getElementById('client-card-zone');  
+  zone.style.display = 'block';  
+  zone.scrollIntoView({ behavior: 'smooth', block: 'start' });  
+}
+
+function openEditClientModal() {  
+  const name = document.getElementById('card-client-name').textContent;  
+  const cid = document.getElementById('card-add-client-id').value;  
+  const c = CLIENTS_DATA[cid];  
+  if (!c) return;  
+  document.getElementById('edit-client-form').action = '/admin/client/edit/' + cid;  
+  document.getElementById('edit-client-name').value = c.name;  
+  document.getElementById('edit-client-dolibarr').value = c.dolibarr_name || '';  
+  document.getElementById('edit-client-address').value = c.address || '';  
+  document.getElementById('edit-client-contact').value = c.contact_name || '';  
+  document.getElementById('edit-client-phone').value = c.contact_phone || '';  
+  document.getElementById('edit-client-notes').value = c.notes_permanentes || '';  
+  document.getElementById('edit-client-quote-url').value = c.dolibarr_quote_url || '';  
+  document.getElementById('modal-client').classList.add('open');  
+}
+
+function toggleSection(id) {  
+  const el = document.getElementById(id);  
+  el.style.display = el.style.display === 'none' ? '' : 'none';  
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+let dolibarrTimer = null;  
+function searchDolibarr(val) {  
+  const box = document.getElementById('dolibarr-suggestions');  
+  if (val.length < 2) { box.style.display = 'none'; return; }  
+  clearTimeout(dolibarrTimer);  
+  dolibarrTimer = setTimeout(() => {  
+    fetch('/admin/search-dolibarr?q=' + encodeURIComponent(val))  
+      .then(r => r.json())  
+      .then(data => {  
+        if (!data.length) { box.style.display = 'none'; return; }  
+        box.innerHTML = data.map(d =>  
+          `<div onclick="selectDolibarr('${d.name.replace(/'/g,"\\'")}')"  
+                style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;"  
+                onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">  
+            ${d.name}</div>`  
+        ).join('');  
+        box.style.display = 'block';  
+      }).catch(() => { box.style.display = 'none'; });  
+  }, 300);  
+}
+
+function selectDolibarr(name) {  
+  document.getElementById('edit-client-dolibarr').value = name;  
+  document.getElementById('dolibarr-suggestions').style.display = 'none';  
+}
+
+document.addEventListener('click', function(e) {  
+  if (!e.target.closest('#edit-client-dolibarr') && !e.target.closest('#dolibarr-suggestions')) {  
+    const box = document.getElementById('dolibarr-suggestions');  
+    if (box) box.style.display = 'none';  
+  }  
+});
+
+document.querySelectorAll('.modal-overlay').forEach(overlay => {  
+  overlay.addEventListener('click', function(e) {  
+    if (e.target === this) this.classList.remove('open');  
+  });  
+});
+
+function checkSyncStatus() {  
+  fetch('/admin/sync-status')  
+    .then(r => r.json())  
+    .then(data => {  
+      const el = document.getElementById('sync-status');  
+      if (!el) return;  
+      if (data.running) {  
+        el.textContent = '⏳ Sync en cours... ' + (data.imported + data.updated) + ' clients traités';  
+        el.style.color = 'var(--orange)';  
+      } else if (data.done && data.message) {  
+        el.textContent = '✅ ' + data.message;  
+        el.style.color = 'var(--green)';  
+      }  
+    }).catch(() => {});  
+}  
+checkSyncStatus();  
+setInterval(checkSyncStatus, 4000);  
+</script>  
+{% endblock %}  
