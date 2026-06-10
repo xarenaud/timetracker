@@ -891,6 +891,19 @@ def assign_services_bulk():
     conn.commit()
     conn.close()
     return redirect(url_for('admin'))
+@app.route('/admin/add_service', methods=['POST'])  
+@admin_required  
+def add_service():  
+    client_id = request.form['client_id']  
+    template_id = request.form['template_id']  
+    monthly_hours = float(request.form.get('monthly_hours', 0))  
+    conn = get_db()  
+    c = conn.cursor()  
+    c.execute(f"INSERT INTO client_services (client_id, template_id, monthly_hours) VALUES ({PLACEHOLDER},{PLACEHOLDER},{PLACEHOLDER})",  
+              (client_id, template_id, monthly_hours))  
+    conn.commit()  
+    conn.close()  
+    return redirect(url_for('admin'))
 
 @app.route('/admin/edit_service/<int:csid>', methods=['POST'])
 @admin_required
