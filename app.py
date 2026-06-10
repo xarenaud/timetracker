@@ -248,8 +248,8 @@ def migrate_db():
     """Ajoute les colonnes manquantes si la DB existe déjà (migration non destructive)."""
     conn = get_db()
     c = conn.cursor()
-    try:
-        if USE_PG:
+    try:  
+        if USE_PG:  
             c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS collab_start TEXT DEFAULT NULL")  
             c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS collab_end TEXT DEFAULT NULL")  
             c.execute("ALTER TABLE client_services ADD COLUMN IF NOT EXISTS note TEXT DEFAULT NULL")  
@@ -259,20 +259,14 @@ def migrate_db():
             c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS contact_name TEXT DEFAULT NULL")  
             c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS contact_phone TEXT DEFAULT NULL")  
             c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS notes_permanentes TEXT DEFAULT NULL")  
-            c.execute("ALTER TABLE client_services ADD COLUMN IF NOT EXISTS note TEXT DEFAULT NULL")  
-            c.execute("ALTER TABLE client_services ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT NULL")  
-            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS dolibarr_name TEXT DEFAULT NULL")  
-            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS address TEXT DEFAULT NULL")  
-            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS contact_name TEXT DEFAULT NULL")  
-            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS contact_phone TEXT DEFAULT NULL")  
-            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS notes_permanentes TEXT DEFAULT NULL")  
-        else:
-            try:
-                c.execute("ALTER TABLE clients ADD COLUMN collab_start TEXT DEFAULT NULL")
-            except: pass
-            try:
-                c.execute("ALTER TABLE clients ADD COLUMN collab_end TEXT DEFAULT NULL")
-            except: pass
+            c.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS dolibarr_quote_url TEXT DEFAULT NULL")  
+        else:  
+            try:  
+                c.execute("ALTER TABLE clients ADD COLUMN collab_start TEXT DEFAULT NULL")  
+            except: pass  
+            try:  
+                c.execute("ALTER TABLE clients ADD COLUMN collab_end TEXT DEFAULT NULL")  
+            except: pass  
             try:  
                 c.execute("ALTER TABLE client_services ADD COLUMN note TEXT DEFAULT NULL")  
             except: pass  
@@ -282,11 +276,26 @@ def migrate_db():
             try:  
                 c.execute("ALTER TABLE clients ADD COLUMN dolibarr_name TEXT DEFAULT NULL")  
             except: pass  
-        conn.commit()
-        print("[MIGRATE] Colonnes collab_start / collab_end / note OK")
-    except Exception as e:
-        print(f"[MIGRATE] {e}")
-    conn.close()
+            try:  
+                c.execute("ALTER TABLE clients ADD COLUMN address TEXT DEFAULT NULL")  
+            except: pass  
+            try:  
+                c.execute("ALTER TABLE clients ADD COLUMN contact_name TEXT DEFAULT NULL")  
+            except: pass  
+            try:  
+                c.execute("ALTER TABLE clients ADD COLUMN contact_phone TEXT DEFAULT NULL")  
+            except: pass  
+            try:  
+                c.execute("ALTER TABLE clients ADD COLUMN notes_permanentes TEXT DEFAULT NULL")  
+            except: pass  
+            try:  
+                c.execute("ALTER TABLE clients ADD COLUMN dolibarr_quote_url TEXT DEFAULT NULL")  
+            except: pass  
+        conn.commit()  
+        print("[MIGRATE] Colonnes OK")  
+    except Exception as e:  
+        print(f"[MIGRATE] {e}")  
+    conn.close()  
 
 def hash_pw(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
