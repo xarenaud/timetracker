@@ -727,3 +727,29 @@ if __name__=='__main__':
     init_db();migrate_db()
     print("✅ CX-Media TimeTracker — http://127.0.0.1:8080")
     app.run(debug=True,host='0.0.0.0',port=8080)
+
+# ── ADMIN CLIENTS PAGE ────────────────────────────────────────────────────────
+@app.route('/admin/clients')
+@admin_required
+def admin_clients():
+    conn=get_db();c=conn.cursor()
+    c.execute("SELECT id,name,active,dolibarr_name,address,contact_name,contact_phone,notes_permanentes FROM clients ORDER BY name")
+    rows=c.fetchall();conn.close()
+    if USE_PG:
+        clients=[{'id':r[0],'name':r[1],'active':r[2],'dolibarr_name':r[3],'address':r[4],'contact_name':r[5],'contact_phone':r[6],'notes_permanentes':r[7]} for r in rows]
+    else:
+        clients=[dict(r) for r in rows]
+    return render_template('admin_clients.html',clients=clients)
+
+@app.route('/admin/client/<int:cid>')
+@admin_required
+def admin_client_detail(cid):
+    conn=get_db();c=conn.cursor()
+    c.execute(f"SELECT id,name,active,dolibarr_name,address,contact_name,contact_phone,notes_permanentes,dolibarr_quote_url FROM clients WHERE id={PLACEHOLDER}",(cid,))
+    row=c.fetchone()
+    if not row: conn.close();return "Client introuvable",404
+    client={'id':row[0],'name':row[1],'active':row[2],'dolibarr_name':row[3],'address':row[4],'contact_name':row[5],'contact_phone':row[6],'notes_permanentes':row[7],'dolibarr_quote_url':row[8]} if USE_PG else dict(row)
+    c.execute(f"SELECT cs.id,st.name,cs.monthly_hours,cs.note FROM client_services cs JOIN service_templates st ON cs.template_id=st.id WHERE cs.client_id={PLACEHOLDER} ORDER BY st.name",(cid,))
+    sr=c.fetchall();conn.close()
+    services=[{'id':r[0],'name':r[1],'monthly_hours':r[2],'note':r[3]} for r in sr] if USE_PG else [dict(r) for r in sr]
+    return render_template('admin_client_detail.html',client=client,services=services)
