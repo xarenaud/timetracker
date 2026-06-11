@@ -718,6 +718,119 @@ def save_collab_settings():
             c.execute(f"INSERT OR REPLACE INTO collaborator_settings (user_id,hourly_cost,vendable_hours) VALUES ({P(3)})",(uid,cost,hours))
     conn.commit();conn.close()
     return redirect(url_for('dashboard',month=request.form.get('month',datetime.now().strftime('%Y-%m'))))
+# ── ADMIN CLIENTS ─────────────────────────────────────────────────────────────
+@app.route('/admin/clients')
+@admin_required
+def admin_clients():
+    conn=get_db();c=conn.cursor()
+    c.execute("SELECT id,name,active,dolibarr_name,address,contact_name,contact_phone,notes_permanentes FROM clients ORDER BY name")
+    rows=c.fetchall();conn.close()
+    if USE_PG:
+        clients=[{'id':r[0],'name':r[1],'active':r[2],'dolibarr_name':r[3],'address':r[4],'contact_name':r[5],'contact_phone':r[6],'notes_permanentes':r[7]} for r in rows]
+    else:
+        clients=[dict(r) for r in rows]
+    return render_template('admin_clients.html',clients=clients)
+
+@app.route('/admin/client/<int:cid>')
+@admin_required
+def admin_client_detail(cid):
+    conn=get_db();c=conn.cursor()
+    c.execute(f"SELECT id,name,active,dolibarr_name,address,contact_name,contact_phone,notes_permanentes,dolibarr_quote_url FROM clients WHERE id={PLACEHOLDER}",(cid,))
+    row=c.fetchone()
+    if not row: conn.close();return "Client introuvable",404
+    client={'id':row[0],'name':row[1],'active':row[2],'dolibarr_name':row[3],'address':row[4],'contact_name':row[5],'contact_phone':row[6],'notes_permanentes':row[7],'dolibarr_quote_url':row[8]} if USE_PG else dict(row)
+    c.execute(f"SELECT cs.id,st.name,cs.monthly_hours,cs.note FROM client_services cs JOIN service_templates st ON cs.template_id=st.id WHERE cs.client_id={PLACEHOLDER} ORDER BY st.name",(cid,))
+    sr=c.fetchall();conn.close()
+    services=[{'id':r[0],'name':r[1],'monthly_hours':r[2],'note':r[3]} for r in sr] if USE_PG else [dict(r) for r in sr]
+    return render_template('admin_client_detail.html',client=client,services=services)
+
+@app.route('/admin/client/<int:cid>/edit',methods=['POST'])
+@admin_required
+def edit_client(cid):
+    dolibarr_name=request.form.get('dolibarr_name','').strip() or None
+    address=request.form.get('address','').strip() or None
+    contact_name=request.form.get('contact_name','').strip() or None
+    contact_phone=request.form.get('contact_phone','').strip() or None
+    notes=request.form.get('notes_permanentes','').strip() or None
+    dolibarr_quote_url=request.form.get('dolibarr_quote_url','').strip() or None
+    conn=get_db();c=conn.cursor()
+    c.execute(f"UPDATE clients SET dolibarr_name={PLACEHOLDER},address={PLACEHOLDER},contact_name={PLACEHOLDER},contact_phone={PLACEHOLDER},notes_permanentes={PLACEHOLDER},dolibarr_quote_url={PLACEHOLDER} WHERE id={PLACEHOLDER}",(dolibarr_name,address,contact_name,contact_phone,notes,dolibarr_quote_url,cid))
+    conn.commit();conn.close()
+    return redirect(url_for('admin_client_detail',cid=cid))
+
+# ── DOLIBARR SYNC ─────────────────────────────────────────────────────────────
+import threading
+_sync_status={'running':False,'done':False,'imported':0,'updated':0,'message':''}
+
+@app.route('/admin/sync-dolibarr',methods=['POST'])
+@admin_required
+def sync_dolibarr():
+    global _sync_status
+    if _sync_status.get('running'):
+        return jsonify({'error':'Sync déjà en cours'}),409
+    def do_sync():
+        global _sync_status
+        _sync_status={'running':True,'done':False,'imported':0,'updated':0,'message':'Synchronisation en cours...'}
+        try:
+            import requests as req
+            DURL=os.environ.get('DOLIBARR_URL','https://client.cx-com.be')
+            DKEY=os.environ.get('DOLIBARR_KEY','')
+            headers={'DOLAPIKEY':DKEY,'Accept':'application/json'}
+            page=0;all_clients=[]
+            while True:
+                resp=req.get(f"{DURL}/api/index.php/thirdparties",headers=headers,params={'limit':100,'page':page,'sortfield':'t.nom','sortorder':'ASC'},timeout=15)
+                if resp.status_code!=200:
+                    _sync_status['message']=f"Erreur API: {resp.status_code}";_sync_status['running']=False;return
+                data=resp.json()
+                if not data: break
+                all_clients.extend(data)
+                if len(data)<100: break
+                page+=1
+            conn=get_db();c=conn.cursor()
+            # Crée la table si elle n'existe pas
+            if USE_PG:
+                c.execute("CREATE TABLE IF NOT EXISTS dolibarr_cache (id SERIAL PRIMARY KEY,dolibarr_id TEXT UNIQUE NOT NULL,nom TEXT,email TEXT,phone TEXT,address TEXT,zip_code TEXT,town TEXT,country TEXT,last_sync TEXT)")
+            else:
+                c.execute("CREATE TABLE IF NOT EXISTS dolibarr_cache (id INTEGER PRIMARY KEY AUTOINCREMENT,dolibarr_id TEXT UNIQUE NOT NULL,nom TEXT,email TEXT,phone TEXT,address TEXT,zip_code TEXT,town TEXT,country TEXT,last_sync TEXT)")
+            imported=0;updated=0;now=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            for cl in all_clients:
+                did=str(cl.get('id',''));nom=cl.get('name','') or cl.get('nom','') or ''
+                email=cl.get('email','') or '';phone=cl.get('phone','') or ''
+                address=cl.get('address','') or '';zip_code=cl.get('zip','') or ''
+                town=cl.get('town','') or ''
+                country=cl.get('country',{}).get('label','') if isinstance(cl.get('country'),dict) else ''
+                c.execute(f"SELECT id FROM dolibarr_cache WHERE dolibarr_id={PLACEHOLDER}",(did,))
+                ex=c.fetchone()
+                if ex:
+                    c.execute(f"UPDATE dolibarr_cache SET nom={PLACEHOLDER},email={PLACEHOLDER},phone={PLACEHOLDER},address={PLACEHOLDER},zip_code={PLACEHOLDER},town={PLACEHOLDER},country={PLACEHOLDER},last_sync={PLACEHOLDER} WHERE dolibarr_id={PLACEHOLDER}",(nom,email,phone,address,zip_code,town,country,now,did))
+                    updated+=1
+                else:
+                    c.execute(f"INSERT INTO dolibarr_cache (dolibarr_id,nom,email,phone,address,zip_code,town,country,last_sync) VALUES ({P(9)})",(did,nom,email,phone,address,zip_code,town,country,now))
+                    imported+=1
+            conn.commit();conn.close()
+            _sync_status={'running':False,'done':True,'imported':imported,'updated':updated,'message':f"✅ Sync terminée — {imported} nouveaux, {updated} mis à jour"}
+        except Exception as e:
+            _sync_status={'running':False,'done':True,'imported':0,'updated':0,'message':f"❌ Erreur: {str(e)}"}
+    t=threading.Thread(target=do_sync);t.daemon=True;t.start()
+    return jsonify({'ok':True,'message':'Sync démarrée en arrière-plan'})
+
+@app.route('/admin/sync-status')
+@admin_required
+def sync_status():
+    return jsonify(_sync_status)
+
+@app.route('/admin/search-dolibarr')
+@admin_required
+def search_dolibarr():
+    q=request.args.get('q','').strip().lower()
+    if len(q)<2: return jsonify([])
+    conn=get_db();c=conn.cursor()
+    if USE_PG:
+        c.execute("SELECT dolibarr_id,nom,email,town FROM dolibarr_cache WHERE LOWER(nom) LIKE %s ORDER BY nom LIMIT 10",(f'%{q}%',))
+    else:
+        c.execute("SELECT dolibarr_id,nom,email,town FROM dolibarr_cache WHERE LOWER(nom) LIKE ? ORDER BY nom LIMIT 10",(f'%{q}%',))
+    rows=c.fetchall();conn.close()
+    return jsonify([{'id':r[0],'nom':r[1],'name':r[1],'email':r[2],'town':r[3]} for r in rows] if USE_PG else [dict(r) for r in rows])
 
 # ── EXPORT ────────────────────────────────────────────────────────────────────  
 from export_routes import register_export_routes  
