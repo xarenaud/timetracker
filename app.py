@@ -719,6 +719,28 @@ def save_collab_settings():
     conn.commit();conn.close()
     return redirect(url_for('dashboard',month=request.form.get('month',datetime.now().strftime('%Y-%m'))))
 
+
+@app.route("/admin/edit_service_ajax/<int:csid>", methods=["POST"])
+@admin_required
+def edit_service_ajax(csid):
+    data = request.get_json()
+    monthly_hours = float(data.get("monthly_hours", 0))
+    updated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    conn=get_db();c=conn.cursor()
+    c.execute(f"UPDATE client_services SET monthly_hours={PLACEHOLDER}, updated_at={PLACEHOLDER} WHERE id={PLACEHOLDER}",
+              (monthly_hours, updated_at, csid))
+    conn.commit();conn.close()
+    return jsonify({"ok": True})
+
+# ── EXPORT ────────────────────────────────────────────────────────────────────
+from export_routes import register_export_routes
+register_export_routes(app,get_db,USE_PG,PLACEHOLDER,P,get_working_days)
+
+if __name__=='__main__':
+    init_db();migrate_db()
+    print("✅ CX-Media TimeTracker — http://127.0.0.1:8080")
+    app.run(debug=True,host='0.0.0.0',port=8080)
+
 # ── ADMIN CLIENTS PAGE ────────────────────────────────────────────────────────
 @app.route('/admin/clients')
 @admin_required
@@ -744,13 +766,3 @@ def admin_client_detail(cid):
     sr=c.fetchall();conn.close()
     services=[{'id':r[0],'name':r[1],'monthly_hours':r[2],'note':r[3]} for r in sr] if USE_PG else [dict(r) for r in sr]
     return render_template('admin_client_detail.html',client=client,services=services)
-
-
-# ── EXPORT ────────────────────────────────────────────────────────────────────
-from export_routes import register_export_routes
-register_export_routes(app,get_db,USE_PG,PLACEHOLDER,P,get_working_days)
-
-if __name__=='__main__':
-    init_db();migrate_db()
-    print("✅ CX-Media TimeTracker — http://127.0.0.1:8080")
-    app.run(debug=True,host='0.0.0.0',port=8080)
